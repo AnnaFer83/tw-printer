@@ -970,7 +970,7 @@ function setupMultiMachineInputSheet(clientObj) {
             tr.innerHTML = `
                 <td>
                     <div style="font-weight:600;">${m.name}</div>
-                    <div style="font-size:0.7rem; color:var(--text-muted);">Abono Fijo</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
                 </td>
                 <td colspan="2" class="text-center text-muted" style="font-size:0.75rem;">Fijo (Sin contadores)</td>
                 <td class="text-right font-weight-bold" style="padding-right: 5px;">${PDFGenerator.formatCurrency(m.customCost)}</td>
@@ -982,7 +982,7 @@ function setupMultiMachineInputSheet(clientObj) {
             tr.innerHTML = `
                 <td>
                     <div style="font-weight:600;">${m.name}</div>
-                    <div style="font-size:0.7rem; color:var(--text-muted);">Abono: ${PDFGenerator.formatCurrency(abono)}</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
                 </td>
                 <td><input type="number" id="prev-${m.id}" value="${prevVal}" min="0" oninput="recalcMultiSheetPreview()"></td>
                 <td><input type="number" id="curr-${m.id}" value="${currVal}" min="0" oninput="recalcMultiSheetPreview()"></td>
