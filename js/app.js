@@ -75,49 +75,115 @@ const DefaultData = {
 };
 
 // --- CICLO DE VIDA DE LA APLICACIÓN ---
-document.addEventListener("DOMContentLoaded", () => {
-    initApp();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initApp();
     setupEventListeners();
     renderAll();
 });
 
 /**
- * Inicializa el estado cargando desde LocalStorage o seteando datos por defecto
+ * Envía el estado de la aplicación actual al servidor backend para sincronización persistente (centralizada).
+ * Al mismo tiempo, guarda una copia local de respaldo en el localStorage de esta máquina.
  */
-function initApp() {
-    // Cargar Planes
-    const savedPlans = localStorage.getItem("tw_plans");
-    if (savedPlans) {
-        AppState.plans = JSON.parse(savedPlans);
-    } else {
-        AppState.plans = [...DefaultData.plans];
-        savePlansToStorage();
+async function syncWithServer() {
+    // 1. Guardar en localStorage siempre como copia de respaldo local
+    localStorage.setItem("tw_plans", JSON.stringify(AppState.plans));
+    localStorage.setItem("tw_clients", JSON.stringify(AppState.clients));
+    localStorage.setItem("tw_readings", JSON.stringify(AppState.readings));
+    localStorage.setItem("tw_config", JSON.stringify(AppState.config));
+    
+    // 2. Intentar guardar en la base de datos centralizada del servidor
+    const payload = {
+        clients: AppState.clients,
+        plans: AppState.plans,
+        readings: AppState.readings,
+        config: AppState.config
+    };
+    
+    try {
+        const response = await fetch('/api/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+            console.warn("El servidor no pudo procesar el guardado de datos.");
+        }
+    } catch (e) {
+        console.warn("No se pudo conectar con el servidor para guardar los datos. Se usará el almacenamiento local.", e);
+    }
+}
+
+function savePlansToStorage() { syncWithServer(); }
+function saveClientsToStorage() { syncWithServer(); }
+function saveReadingsToStorage() { syncWithServer(); }
+function saveConfigToStorage() { syncWithServer(); }
+
+/**
+ * Inicializa el estado cargando desde el Servidor centralizado (Base de datos)
+ * o cayendo en LocalStorage/DefaultData en caso de que no esté activo el backend.
+ */
+async function initApp() {
+    let dataLoadedFromServer = false;
+    
+    try {
+        const response = await fetch('/api/data');
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.clients && data.plans && data.readings && data.config) {
+                if (data.clients.length > 0 || data.plans.length > 0) {
+                    AppState.clients = data.clients;
+                    AppState.plans = data.plans;
+                    AppState.readings = data.readings;
+                    AppState.config = data.config;
+                    dataLoadedFromServer = true;
+                    console.log("Datos cargados exitosamente desde la base de datos del servidor.");
+                } else {
+                    console.log("Base de datos del servidor vacía. Se migrarán los datos locales al servidor.");
+                }
+            }
+        }
+    } catch (e) {
+        console.log("Servidor de base de datos no disponible. Cargando desde el almacenamiento local del navegador.", e);
     }
 
-    // Cargar Clientes
-    const savedClients = localStorage.getItem("tw_clients");
-    if (savedClients) {
-        AppState.clients = JSON.parse(savedClients);
-    } else {
-        AppState.clients = [...DefaultData.clients];
-        saveClientsToStorage();
-    }
+    if (!dataLoadedFromServer) {
+        // Cargar Planes
+        const savedPlans = localStorage.getItem("tw_plans");
+        if (savedPlans) {
+            AppState.plans = JSON.parse(savedPlans);
+        } else {
+            AppState.plans = [...DefaultData.plans];
+            savePlansToStorage();
+        }
 
-    // Cargar Parámetros Generales
-    const savedConfig = localStorage.getItem("tw_config");
-    if (savedConfig) {
-        AppState.config = JSON.parse(savedConfig);
-    } else {
-        saveConfigToStorage();
-    }
+        // Cargar Clientes
+        const savedClients = localStorage.getItem("tw_clients");
+        if (savedClients) {
+            AppState.clients = JSON.parse(savedClients);
+        } else {
+            AppState.clients = [...DefaultData.clients];
+            saveClientsToStorage();
+        }
 
-    // Cargar Lecturas
-    const savedReadings = localStorage.getItem("tw_readings");
-    if (savedReadings) {
-        AppState.readings = JSON.parse(savedReadings);
-    } else {
-        AppState.readings = [...DefaultData.readings];
-        saveReadingsToStorage();
+        // Cargar Parámetros Generales
+        const savedConfig = localStorage.getItem("tw_config");
+        if (savedConfig) {
+            AppState.config = JSON.parse(savedConfig);
+        } else {
+            saveConfigToStorage();
+        }
+
+        // Cargar Lecturas
+        const savedReadings = localStorage.getItem("tw_readings");
+        if (savedReadings) {
+            AppState.readings = JSON.parse(savedReadings);
+        } else {
+            AppState.readings = [...DefaultData.readings];
+            saveReadingsToStorage();
+        }
     }
 
     // Establecer período correspondiente en los selects de período activo
@@ -198,17 +264,10 @@ function initApp() {
         });
     }
 
-    if (dataModified) {
-        savePlansToStorage();
-        saveClientsToStorage();
-        saveReadingsToStorage();
+    if (dataModified || !dataLoadedFromServer) {
+        syncWithServer();
     }
 }
-
-function savePlansToStorage() { localStorage.setItem("tw_plans", JSON.stringify(AppState.plans)); }
-function saveClientsToStorage() { localStorage.setItem("tw_clients", JSON.stringify(AppState.clients)); }
-function saveReadingsToStorage() { localStorage.setItem("tw_readings", JSON.stringify(AppState.readings)); }
-function saveConfigToStorage() { localStorage.setItem("tw_config", JSON.stringify(AppState.config)); }
 
 // --- MANEJADORES DE EVENTOS ---
 function setupEventListeners() {
