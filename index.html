@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TecnoWork - Informes de Consumo de Impresión (LEXORER S.R.L.)</title>
+    
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="dark-mode">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-brand" style="justify-content: center; margin-bottom: 2.5rem; display: flex; width: 100%;">
+                <!-- Logo de TecnoWork Oficial -->
+                <div class="brand-logo-container" style="width: 100%; text-align: center; display: flex; justify-content: center;">
+                    <img src="img/logo.png" alt="TecnoWork" style="max-height: 75px; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));">
+                </div>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <a href="#dashboard" class="menu-item active" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </a>
+                <a href="#importar" class="menu-item" data-tab="importar">
+                    <i class="fa-solid fa-file-import"></i> Cargar Datos
+                </a>
+                <a href="#clientes" class="menu-item" data-tab="clientes">
+                    <i class="fa-solid fa-users"></i> Clientes y Equipos
+                </a>
+                <a href="#configuracion" class="menu-item" data-tab="configuracion">
+                    <i class="fa-solid fa-gears"></i> Configuración
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="theme-toggle">
+                    <span class="theme-label"><i class="fa-solid fa-moon"></i> Modo Oscuro</span>
+                    <label class="switch">
+                        <input type="checkbox" id="theme-switch" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="footer-copy">
+                    &copy; 2026 LEXORER SRL
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Navbar -->
+            <header class="top-navbar">
+                <div class="page-title">
+                    <h2 id="current-tab-title">Resumen de Consumo</h2>
+                    <p id="current-tab-desc" class="text-muted">Visualiza y calcula el consumo e histórico de tus clientes.</p>
+                </div>
+                
+                <div class="top-navbar-actions">
+                    <div class="date-badge">
+                        <i class="fa-regular fa-calendar-days"></i>
+                        <select id="report-period-month" style="background: transparent; border: none; color: var(--text-primary); font-family: var(--font-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; outline: none;">
+                            <option value="Enero">Enero</option>
+                            <option value="Febrero">Febrero</option>
+                            <option value="Marzo">Marzo</option>
+                            <option value="Abril">Abril</option>
+                            <option value="Mayo">Mayo</option>
+                            <option value="Junio" selected>Junio</option>
+                            <option value="Julio">Julio</option>
+                            <option value="Agosto">Agosto</option>
+                            <option value="Septiembre">Septiembre</option>
+                            <option value="Octubre">Octubre</option>
+                            <option value="Noviembre">Noviembre</option>
+                            <option value="Diciembre">Diciembre</option>
+                        </select>
+                        <select id="report-period-year" style="background: transparent; border: none; color: var(--text-primary); font-family: var(--font-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; outline: none; margin-left: 5px;">
+                            <option value="2025">2025</option>
+                            <option value="2026" selected>2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                            <option value="2029">2029</option>
+                            <option value="2030">2030</option>
+                        </select>
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB: Dashboard -->
+            <section id="tab-dashboard" class="tab-pane active">
+                <!-- Summary Stats Widgets -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon icon-blue">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Clientes Facturados</span>
+                            <h3 class="stat-value" id="stat-total-clients">0</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon icon-cyan">
+                            <i class="fa-solid fa-print"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Equipos Totales</span>
+                            <h3 class="stat-value" id="stat-total-machines">0 <span class="unit">máquinas</span></h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon icon-amber">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total Excedentes</span>
+                            <h3 class="stat-value" id="stat-total-excess">0 <span class="unit">copias</span></h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main dashboard layout -->
+                <div style="margin-top: 2rem;">
+                    <!-- Billing & Consumption Table -->
+                    <div class="dashboard-card" style="width: 100%;">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-list-check"></i>
+                                <h3>Resumen de Facturación por Cliente</h3>
+                            </div>
+                            <div class="header-actions">
+                                <button class="btn btn-secondary btn-sm" id="btn-clear-data">
+                                    <i class="fa-solid fa-trash-can"></i> Limpiar Todo
+                                </button>
+                                <button class="btn btn-primary btn-sm" id="btn-export-all-pdf">
+                                    <i class="fa-solid fa-file-pdf"></i> Exportar Reporte Consolidado
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="data-table" id="table-readings">
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Equipos</th>
+                                        <th>Mes Anterior</th>
+                                        <th>Mes Actual</th>
+                                        <th>Consumo</th>
+                                        <th>Excedente</th>
+                                        <th>Monto Abono</th>
+                                        <th>Monto Excedente</th>
+                                        <th>Total Factura</th>
+                                        <th class="actions-col">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-readings-body">
+                                    <!-- Dynamic rows loaded here -->
+                                    <tr class="empty-state-row">
+                                        <td colspan="10">
+                                            <div class="empty-state">
+                                                <i class="fa-solid fa-folder-open"></i>
+                                                <p>No hay lecturas cargadas para este período.</p>
+                                                <p class="sub-text">Carga contadores desde "Cargar Datos" o registra en el formulario rápido.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Importar Datos -->
+            <section id="tab-importar" class="tab-pane">
+                <div class="import-container">
+                    <!-- Columna Izquierda: Carga Automática y Pegar Texto -->
+                    <div class="import-left-column" style="display: flex; flex-direction: column; gap: 2rem;">
+                        <!-- Card 1: Subir archivos -->
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <div class="header-title">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                    <h3>Cargar Archivo Excel, PDF o Imagen</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted mb-4">Sube planillas de Excel, archivos CSV, PDFs, imágenes (JPEG, PNG) o archivos de texto. El sistema procesará e identificará la información localmente.</p>
+                                
+                                <!-- Drag and drop zone -->
+                                <div class="drop-zone" id="excel-drop-zone" style="position: relative;">
+                                    <div class="drop-zone-content">
+                                        <div class="drop-zone-icon">
+                                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                                        </div>
+                                        <div class="drop-zone-text">
+                                            <h4>Arrastra tus reportes aquí</h4>
+                                            <p>Excel, CSV, PDF, Imagen o Texto (.txt)</p>
+                                        </div>
+                                    </div>
+                                    <!-- Loading overlay for OCR / PDF parsing -->
+                                    <div class="drop-zone-loader hidden" id="drop-zone-loader">
+                                        <div class="loader-spinner">
+                                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                        </div>
+                                        <div class="loader-text">
+                                            <h4 id="loader-title">Procesando archivo...</h4>
+                                            <p id="loader-progress">Por favor espera un momento</p>
+                                        </div>
+                                    </div>
+                                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv, .pdf, .jpg, .jpeg, .png, .webp, .txt, .log" style="display: none;">
+                                </div>
+
+                                <!-- Preview Column Mapper Modal / Section -->
+                                <div id="column-mapper" class="column-mapper hidden">
+                                    <h4>Mapeo de Columnas Detectadas</h4>
+                                    <p class="text-muted mb-3">Identificamos las columnas de tu archivo. Confirma qué columna corresponde a cada dato:</p>
+                                    
+                                    <div class="mapper-grid">
+                                        <div class="form-group">
+                                            <label for="map-client">Columna del Cliente</label>
+                                            <select id="map-client"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="map-machine">Columna del Equipo / Máquina</label>
+                                            <select id="map-machine"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="map-prev">Columna Contador Anterior</label>
+                                            <select id="map-prev"></select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="map-curr">Columna Contador Actual</label>
+                                            <select id="map-curr"></select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mapper-actions">
+                                        <button class="btn btn-secondary" id="btn-cancel-mapping">Cancelar</button>
+                                        <button class="btn btn-primary" id="btn-apply-mapping">Procesar Importación</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Pegar Texto -->
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <div class="header-title">
+                                    <i class="fa-solid fa-paste"></i>
+                                    <h3>Pegar Texto (WhatsApp / Email)</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted mb-3">Si tus clientes te pasan los contadores en texto libre, pégalos aquí. El motor detectará los números e intentará incorporarlos.</p>
+                                <div class="form-group">
+                                    <label for="clipboard-text">Pega el texto aquí</label>
+                                    <textarea id="clipboard-text" rows="10" placeholder="Ejemplo de formato multi-equipo:&#10;ACLISA:&#10;XEROX B405: 31973 a 32961&#10;RICOH 3710 dn: 36463 a 38435&#10;SCANER X 4: 0"></textarea>
+                                </div>
+                                <div class="text-right">
+                                    <button class="btn btn-primary" id="btn-parse-text">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Procesar Texto
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Columna Derecha: Planilla de Ficha de Lecturas (Carga Manual o Auto-completado) -->
+                    <div class="dashboard-card" id="manual-entry-card">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                                <h3>Planilla de Lecturas de Ficha</h3>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="entry-client">Seleccionar Cliente</label>
+                                <select id="entry-client">
+                                    <option value="" disabled selected>Seleccione un cliente...</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="entry-period-month">Mes de Lectura</label>
+                                    <select id="entry-period-month">
+                                        <option value="Enero">Enero</option>
+                                        <option value="Febrero">Febrero</option>
+                                        <option value="Marzo">Marzo</option>
+                                        <option value="Abril">Abril</option>
+                                        <option value="Mayo" selected>Mayo</option>
+                                        <option value="Junio">Junio</option>
+                                        <option value="Julio">Julio</option>
+                                        <option value="Agosto">Agosto</option>
+                                        <option value="Septiembre">Septiembre</option>
+                                        <option value="Octubre">Octubre</option>
+                                        <option value="Noviembre">Noviembre</option>
+                                        <option value="Diciembre">Diciembre</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="entry-period-year">Año</label>
+                                    <input type="number" id="entry-period-year" value="2026" min="2020" max="2035">
+                                </div>
+                            </div>
+
+                            <!-- Dynamic table for client machines counters -->
+                            <div id="multi-machine-entry-container" class="multi-machine-entry-container hidden">
+                                <h4>Lecturas por Máquina</h4>
+                                <div class="table-container">
+                                    <table class="compact-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Máquina</th>
+                                                <th>Mes Ant.</th>
+                                                <th>Mes Act.</th>
+                                                <th class="text-right">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="multi-machine-entry-body">
+                                            <!-- Dynamically generated rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="form-group mt-3">
+                                    <label for="entry-notes">Observaciones del Período (Nota al pie del PDF)</label>
+                                    <input type="text" id="entry-notes" placeholder="Ej: Maquina SN: XXXXX con excedente de impresión.">
+                                </div>
+
+                                <div class="calc-row highlighted mt-2">
+                                    <span>Total Estimado Cliente:</span>
+                                    <strong id="multi-preview-total-cost">$0</strong>
+                                </div>
+
+                                <button type="button" class="btn btn-primary btn-block mt-3" id="btn-save-multi-readings">
+                                    <i class="fa-solid fa-floppy-disk"></i> Guardar Lecturas
+                                </button>
+                            </div>
+                            
+                            <div id="multi-machine-placeholder" class="text-center text-muted py-4">
+                                <i class="fa-solid fa-print fa-2x mb-2" style="opacity: 0.3;"></i>
+                                <p class="small">Elige un cliente para desplegar sus máquinas registradas y contadores anteriores.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Clientes y Equipos -->
+            <section id="tab-clientes" class="tab-pane">
+                <div class="clientes-layout">
+                    <!-- Client List Table -->
+                    <div class="dashboard-card card-span-2">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-address-book"></i>
+                                <h3>Clientes Registrados</h3>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="table-clients">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre del Cliente</th>
+                                        <th>Teléfono WhatsApp</th>
+                                        <th>Cantidad de Equipos</th>
+                                        <th>Observaciones Plan (PDF)</th>
+                                        <th>Monto Abono</th>
+                                        <th class="actions-col">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-clients-body">
+                                    <!-- Will be populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Add/Edit Client Form with Sub-machines section -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <h3 id="client-form-title">Registrar Nuevo Cliente</h3>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form id="form-client">
+                                <input type="hidden" id="client-edit-id">
+                                <div class="form-group">
+                                    <label for="client-name">Nombre Comercial / Razón Social</label>
+                                    <input type="text" id="client-name" placeholder="Ej: ACLISA" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="client-phone">Teléfono de Contacto (WhatsApp)</label>
+                                    <input type="text" id="client-phone" placeholder="Ej: 5491133334444 (con código de país sin +)">
+                                    <small class="help-text">Código país + código área + número sin espacios (ej: 5492944xxxxxx)</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="client-observations">Detalle Observaciones del Plan (Sale en PDF)</label>
+                                    <textarea id="client-observations" rows="2" placeholder="Ej: Plan BYN 1500 impresoras y multifuncion Ricoh 3710 y Xerox B405..."></textarea>
+                                </div>
+                                
+                                <!-- Subform for adding machines to the client -->
+                                <div class="machine-subform-container">
+                                    <h4>Listado de Equipos Asignados</h4>
+                                    
+                                    <!-- Temporary machines list builder -->
+                                    <div class="temp-machines-list" id="temp-machines-list">
+                                        <p class="text-muted small text-center py-2">No hay equipos asignados a este cliente aún.</p>
+                                    </div>
+
+                                    <!-- Add Machine inputs -->
+                                    <div class="add-machine-inputs-box">
+                                        <h5><i class="fa-solid fa-circle-plus"></i> Vincular Equipo</h5>
+                                        <div class="form-group">
+                                            <label for="machine-name-input">Nombre / Modelo del Equipo</label>
+                                            <input type="text" id="machine-name-input" placeholder="Ej: RICOH 3710 dn">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="machine-serial-input">Número de Serie (SN)</label>
+                                            <input type="text" id="machine-serial-input" placeholder="Ej: 5160z931098">
+                                        </div>
+                                        
+                                        <div class="checkbox-row mb-2">
+                                            <label class="checkbox-container">
+                                                <input type="checkbox" id="machine-is-fixed">
+                                                <span class="checkmark"></span>
+                                                Es un concepto o abono fijo (sin contadores)
+                                            </label>
+                                        </div>
+
+                                        <div id="machine-plan-fields-box">
+                                            <div class="form-group">
+                                                <label for="machine-plan">Plan de Impresión</label>
+                                                <select id="machine-plan">
+                                                    <option value="" disabled selected>Seleccione un plan...</option>
+                                                    <!-- Loaded from configurations -->
+                                                </select>
+                                            </div>
+                                            <div class="form-row">
+                                                <div class="form-group">
+                                                    <label for="machine-custom-cost">Abono Plan Fijo ($)</label>
+                                                    <input type="number" id="machine-custom-cost" min="0" placeholder="Default de plan">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="machine-custom-excess">Copia Excedente ($)</label>
+                                                    <input type="number" id="machine-custom-excess" min="0" placeholder="Por defecto $90">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div id="machine-fixed-fields-box" class="hidden">
+                                            <div class="form-group">
+                                                <label for="machine-fixed-cost">Monto del Abono Fijo ($)</label>
+                                                <input type="number" id="machine-fixed-cost" min="0" placeholder="Ej: 187200">
+                                            </div>
+                                        </div>
+
+                                        <button type="button" class="btn btn-secondary btn-sm btn-block" id="btn-add-machine-to-list">
+                                            <i class="fa-solid fa-circle-plus"></i> Agregar Equipo a la Ficha
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions-row mt-4">
+                                    <button type="button" class="btn btn-secondary hidden" id="btn-cancel-client-edit">Cancelar</button>
+                                    <button type="submit" class="btn btn-primary" id="btn-submit-client">Guardar Cliente</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: Configuración -->
+            <section id="tab-configuracion" class="tab-pane">
+                <div class="config-grid">
+                    <!-- Config Planes Habituales -->
+                    <div class="dashboard-card card-span-2">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-sliders"></i>
+                                <h3>Configuración de Planes Habituales</h3>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-4">Define los planes predeterminados con sus copias incluidas y precios bases mensuales.</p>
+                            
+                            <div class="table-container">
+                                <table class="data-table" id="table-config-plans">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre del Plan</th>
+                                            <th>Copias Incluidas</th>
+                                            <th>Costo Base Mensual ($)</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-config-plans-body">
+                                        <!-- Prepopulated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Config General Settings -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-wrench"></i>
+                                <h3>Parámetros Generales</h3>
+                            </div>
+                        </div>
+                        <form id="form-config-general" class="card-body">
+                            <div class="form-group">
+                                <label for="config-default-excess-price">Precio Copia Excedente por Defecto ($)</label>
+                                <div class="input-with-icon">
+                                    <i class="fa-solid fa-dollar-sign"></i>
+                                    <input type="number" id="config-default-excess-price" value="90" min="0" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="config-company-name">Nombre de la Empresa Emisora</label>
+                                <input type="text" id="config-company-name" value="LEXORER S.R.L" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="config-company-sub">Subtítulo / Info de Contacto</label>
+                                <input type="text" id="config-company-sub" value="TW - Informes de Consumo de Impresión" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fa-solid fa-floppy-disk"></i> Guardar Parámetros
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Plan creation block -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="header-title">
+                                <i class="fa-solid fa-folder-plus"></i>
+                                <h3 id="plan-form-title">Agregar Nuevo Plan</h3>
+                            </div>
+                        </div>
+                        <form id="form-add-plan" class="card-body">
+                            <input type="hidden" id="plan-edit-id">
+                            <div class="form-group">
+                                <label for="new-plan-name">Nombre del Plan</label>
+                                <input type="text" id="new-plan-name" placeholder="Ej: Plan 2.000 Copias" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-plan-copies">Copias Incluidas</label>
+                                <input type="number" id="new-plan-copies" min="0" placeholder="Ej: 2000" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-plan-cost">Costo Base ($)</label>
+                                <input type="number" id="new-plan-cost" min="0" placeholder="Ej: 110000" required>
+                            </div>
+                            <div class="form-actions-row">
+                                <button type="button" class="btn btn-secondary hidden" id="btn-cancel-plan-edit">Cancelar</button>
+                                <button type="submit" class="btn btn-primary" id="btn-submit-plan"><i class="fa-solid fa-plus"></i> Crear Plan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- NOTIFICATION BOX -->
+    <div id="notification-toast" class="notification-toast">
+        <div class="toast-content">
+            <span id="toast-icon"><i class="fa-solid fa-circle-check"></i></span>
+            <span id="toast-message">Mensaje de notificación exitosa.</span>
+        </div>
+    </div>
+
+    <!-- TECNOWORK PDF GENERATION TEMPLATE (HIDDEN IN UI, PRINT-ONLY STYLE) -->
+    <div id="pdf-print-template" style="position: absolute; left: -9999px; top: -9999px;">
+        <div class="invoice-container">
+            <!-- TecnoWork Header -->
+            <div class="invoice-header" style="margin-bottom: 12px; display: flex; justify-content: center; width: 100%;">
+                <img src="img/logo.png" alt="TecnoWork" style="display: block; max-height: 55px; width: auto; margin: 0 auto;">
+                <span class="pdf-logo-sub" style="display: none;"></span>
+            </div>
+
+            <div style="text-align: center; font-size: 11px; color: #1e293b !important; line-height: 1.4; max-width: 580px; margin: 8px auto 12px auto; font-weight: 500;">
+                Estimado cliente, el siguiente es un detalle de su abono y excedentes. Cualquier duda que tenga al respecto, puede comunicarse al Whatsapp
+            </div>
+
+            <!-- Client Info & Observation Box -->
+            <div style="width: 100%; border: 1px solid #94a3b8; border-radius: 4px; overflow: hidden; margin-bottom: 12px; font-family: 'Inter', sans-serif;">
+                <!-- Row 1: CLIENTE -->
+                <div style="display: flex; border-bottom: 1px solid #94a3b8; min-height: 38px;">
+                    <div style="width: 120px; background-color: #3b4b61; color: white !important; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; padding: 8px 10px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; border-right: 1px solid #94a3b8; text-align: center; flex-shrink: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        CLIENTE:
+                    </div>
+                    <div style="flex-grow: 1; padding: 8px 10px; font-size: 14px; color: #0f172a !important; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: 'Outfit', sans-serif; text-align: center;" class="pdf-client-name">
+                        ACLISA
+                    </div>
+                </div>
+                <!-- Row 2: OBSERVACIONES -->
+                <div style="display: flex; min-height: 38px;">
+                    <div style="width: 120px; background-color: #3b4b61; color: white !important; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; padding: 8px 10px; display: flex; align-items: center; justify-content: center; text-transform: uppercase; border-right: 1px solid #94a3b8; text-align: center; flex-shrink: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        OBSERV.
+                    </div>
+                    <div style="flex-grow: 1; padding: 8px 10px; font-size: 11px; color: #334155 !important; display: flex; align-items: center; justify-content: center; font-weight: 500; line-height: 1.4; text-align: center;" class="pdf-client-observations">
+                        Plan BYN 1500 impresoras y multifuncion Ricoh 3710 y Xerox B405 incluye 1500 impresiones - Excedente $ 90
+                    </div>
+                </div>
+            </div>
+
+            <!-- Month Badge -->
+            <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+                <div style="display: flex; border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+                    <div style="background-color: #3b4b61; color: white !important; padding: 6px 16px;">MES</div>
+                    <div style="background-color: #f1f5f9; color: #1e293b !important; padding: 6px 20px;" class="pdf-period-month">MAYO</div>
+                </div>
+            </div>
+
+            <!-- Main Items Table -->
+            <div class="invoice-table-section" style="margin-bottom: 10px; width: 100%;">
+                <table class="pdf-table" style="border: 1px solid #94a3b8; width: 100%;">
+                    <thead>
+                        <tr style="background-color: #3b4b61 !important;">
+                            <th style="color: white !important; font-weight: 700; border-right: 1px solid #cbd5e1; padding: 8px 10px;">MÁQUINA</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; border-right: 1px solid #cbd5e1; padding: 8px 10px;">ABONO</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; border-right: 1px solid #cbd5e1; padding: 8px 10px;">MES ANTER.</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; border-right: 1px solid #cbd5e1; padding: 8px 10px;">MES ACTUAL</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; border-right: 1px solid #cbd5e1; padding: 8px 10px;">PLAN</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; border-right: 1px solid #cbd5e1; padding: 8px 10px;">EXCEDENTE</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; border-right: 1px solid #cbd5e1; padding: 8px 10px;">VALOR EXD</th>
+                            <th style="color: white !important; font-weight: 700; text-align: right; padding: 8px 10px;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pdf-table-items-body">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Grand Total Section (Green highlighted box) -->
+            <div class="invoice-totals" style="display: flex; justify-content: flex-end; align-items: center; margin-top: 10px; margin-bottom: 15px;">
+                <span style="font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 800; color: #1e293b !important; margin-right: 12px;">TOTAL GENERAL</span>
+                <div style="background-color: #16a34a !important; color: white !important; font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 800; padding: 8px 24px; border-radius: 4px; min-width: 140px; text-align: center; display: inline-block;" class="pdf-grand-total">
+                    697355
+                </div>
+            </div>
+
+            <!-- Footer Notes section -->
+            <div class="pdf-note-section" style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin-top: 8px;">
+                <p style="font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; color: #0f172a !important;" id="pdf-val-notes">
+                    Maquina SN: 5160z931098, con excedente de impresión.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXTERNAL LIBRARIES CDN -->
+    <!-- SheetJS (Excel parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- PapaParse (CSV parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- html2pdf.js (PDF generation) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Chart.js (Interactive graph) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PDF.js (PDF Text extraction) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Tesseract.js (Image OCR) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+
+    <!-- CUSTOM SCRIPTS -->
+    <script src="js/parser.js"></script>
+    <script src="js/pdfGenerator.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
