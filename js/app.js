@@ -1106,6 +1106,7 @@ window.recalcMultiSheetPreview = function() {
 
             const plan = AppState.plans.find(p => p.id === m.planId) || { cost: 0, copies: 0 };
             const planCost = m.customCost !== null ? m.customCost : plan.cost;
+            const planCopies = plan.copies;
 
             if (prevVal === "" || currVal === "") {
                 hasPending = true;
@@ -1114,7 +1115,6 @@ window.recalcMultiSheetPreview = function() {
             } else {
                 const prev = parseInt(prevVal) || 0;
                 const curr = parseInt(currVal) || 0;
-                const planCopies = plan.copies;
                 const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
                 const consumption = Math.max(0, curr - prev);
@@ -1253,7 +1253,8 @@ function populatePlanSelects() {
         if (!s) return;
         s.innerHTML = '<option value="" disabled selected>Seleccione un plan...</option>';
         AppState.plans.forEach(p => {
-            s.innerHTML += `<option value="${p.id}">${p.name} (incluye ${PDFGenerator.formatNumber(p.copies)} copias)</option>`;
+            const copiesText = p.copies === 0 ? "sin copias incl." : `incluye ${PDFGenerator.formatNumber(p.copies)} copias`;
+            s.innerHTML += `<option value="${p.id}">${p.name} (${copiesText})</option>`;
         });
     });
 }
@@ -2249,6 +2250,9 @@ window.generateDefaultObservations = function(clientObj) {
             const copiesFormatted = PDFGenerator.formatNumber(plan.copies);
             const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
             const excessFormatted = PDFGenerator.formatNumber(excessPrice);
+            if (plan.copies === 0) {
+                return `${m.name}: sin copias incl., exd. $${excessFormatted}`;
+            }
             return `${m.name}: incluye ${copiesFormatted} copias, exd. $${excessFormatted}`;
         }
     });
