@@ -798,6 +798,69 @@ function setupEventListeners() {
             renderAll();
         });
     }
+
+    // 12. Aumento Porcentual Masivo de Abonos (Planes)
+    const btnApplyBulk = document.getElementById("btn-apply-bulk-increase");
+    if (btnApplyBulk) {
+        btnApplyBulk.addEventListener("click", () => {
+            const pctInput = document.getElementById("input-bulk-increase-pct");
+            const pct = parseFloat(pctInput.value);
+            if (isNaN(pct) || pct === 0) {
+                showToast("Por favor ingresa un porcentaje de aumento válido (distinto de cero).", "warning");
+                return;
+            }
+
+            const alsoCustom = document.getElementById("chk-bulk-increase-custom-costs").checked;
+            const actionText = pct > 0 ? "aumentar" : "disminuir";
+            const pctAbs = Math.abs(pct);
+
+            if (!confirm(`¿Estás seguro de que deseas ${actionText} todos los abonos base en un ${pctAbs}%?${alsoCustom ? '\nTambién se actualizarán los abonos personalizados de las máquinas de los clientes.' : ''}`)) {
+                return;
+            }
+
+            const factor = 1 + (pct / 100);
+
+            // Aumentar los planes base
+            AppState.plans.forEach(p => {
+                p.cost = Math.round(p.cost * factor);
+            });
+
+            let customUpdated = 0;
+            // Aumentar abonos personalizados de clientes si corresponde
+            if (alsoCustom) {
+                AppState.clients.forEach(c => {
+                    if (c.machines) {
+                        c.machines.forEach(m => {
+                            if (m.customCost !== null) {
+                                m.customCost = Math.round(m.customCost * factor);
+                                customUpdated++;
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Sincronizar y refrescar
+            syncWithServer().then(() => {
+                renderConfigPlansTable();
+                renderClientsTable();
+                recalculateAllReadings();
+                renderReadingsTable();
+                updateStats();
+                updateBillingChart();
+
+                pctInput.value = "";
+                let msg = `Se aplicó un ${pct > 0 ? 'aumento' : 'descuento'} del ${pctAbs}% a todos los planes base.`;
+                if (alsoCustom && customUpdated > 0) {
+                    msg += ` También se actualizaron ${customUpdated} abonos personalizados de clientes.`;
+                }
+                showToast(msg, "success");
+            }).catch(e => {
+                console.error(e);
+                showToast("Error al sincronizar con el servidor.", "error");
+            });
+        });
+    }
 }
 
 /**

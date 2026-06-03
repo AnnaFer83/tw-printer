@@ -39,7 +39,31 @@ const PDFGenerator = {
             logoSub.innerText = config.companyName || 'LEXORER S.R.L.';
         }
         clone.querySelector('.pdf-client-name').innerText = record.clientName.toUpperCase();
-        clone.querySelector('.pdf-client-observations').innerText = clientObs || record.observations || "Detalle de abono y consumos del período.";
+        
+        // Generar detalle dinámico de abonos si no hay observación manual
+        let displayObs = "";
+        if (record.observations && record.observations.trim() !== "") {
+            displayObs = record.observations;
+        } else if (clientObs && clientObs.trim() !== "") {
+            displayObs = clientObs;
+        } else {
+            if (record.machineReadings && record.machineReadings.length > 0) {
+                const parts = record.machineReadings.map(mr => {
+                    const priceFormatted = mr.planCost ? this.formatNumber(mr.planCost) : "0";
+                    if (mr.isFixed) {
+                        return `${mr.name}: Abono Fijo $${priceFormatted}`;
+                    } else {
+                        const copiesFormatted = mr.planCopies ? this.formatNumber(mr.planCopies) : "0";
+                        const excessFormatted = mr.excessPrice ? this.formatNumber(mr.excessPrice) : "0";
+                        return `${mr.name}: Abono $${priceFormatted} (incluye ${copiesFormatted} copias, exd. $${excessFormatted})`;
+                    }
+                });
+                displayObs = "Detalle: " + parts.join(" | ");
+            } else {
+                displayObs = "Detalle de abono y consumos del período.";
+            }
+        }
+        clone.querySelector('.pdf-client-observations').innerText = displayObs;
         
         // Período
         clone.querySelector('.pdf-period-month').innerText = record.periodMonth.toUpperCase();
@@ -112,7 +136,7 @@ const PDFGenerator = {
             margin:       0,
             filename:     filename,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2.5, useCORS: true, letterRendering: true },
+            html2canvas:  { scale: 4.0, useCORS: true, letterRendering: true, logging: false },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
@@ -270,7 +294,7 @@ const PDFGenerator = {
             margin:       [10, 10, 10, 10],
             filename:     filename,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2.2, useCORS: true, letterRendering: true },
+            html2canvas:  { scale: 3.5, useCORS: true, letterRendering: true, logging: false },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 

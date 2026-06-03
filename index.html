@@ -23,7 +23,7 @@
             <div class="sidebar-brand" style="justify-content: center; margin-bottom: 2.5rem; display: flex; width: 100%;">
                 <!-- Logo de TecnoWork Oficial -->
                 <div class="brand-logo-container" style="width: 100%; text-align: center; display: flex; justify-content: center;">
-                    <img src="img/logo.png" alt="TecnoWork" style="max-height: 75px; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));">
+                    <img src="img/logo.png" alt="TecnoWork" style="max-height: 75px; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15)); image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
                 </div>
             </div>
             
@@ -499,6 +499,30 @@
                         <div class="card-body">
                             <p class="text-muted mb-4">Define los planes predeterminados con sus copias incluidas y precios bases mensuales.</p>
                             
+                            <!-- Aumento de Abonos -->
+                            <div class="bulk-increase-container" style="margin-bottom: 20px; padding: 12px 15px; background: var(--bg-body); border: 1px solid var(--border-color); border-radius: 6px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-percent" style="color: var(--color-cyan);"></i>
+                                    Aumento Porcentual Masivo de Abonos
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                    <div class="form-group" style="margin-bottom: 0; display: flex; align-items: center; gap: 6px;">
+                                        <label for="input-bulk-increase-pct" style="margin-bottom: 0; font-size: 0.8rem; font-weight: 500;">Porcentaje de Aumento:</label>
+                                        <div style="position: relative; display: flex; align-items: center;">
+                                            <input type="number" id="input-bulk-increase-pct" placeholder="Ej: 15" step="0.1" style="width: 90px; padding: 6px 24px 6px 8px; font-size: 0.85rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary);">
+                                            <span style="position: absolute; right: 8px; font-size: 0.85rem; color: var(--text-muted);">%</span>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <input type="checkbox" id="chk-bulk-increase-custom-costs" checked style="cursor: pointer; width: 15px; height: 15px;">
+                                        <label for="chk-bulk-increase-custom-costs" style="margin-bottom: 0; font-size: 0.8rem; cursor: pointer; user-select: none;">Aplicar también a abonos personalizados de clientes</label>
+                                    </div>
+                                    <button type="button" id="btn-apply-bulk-increase" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem; height: 32px; display: flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-circle-check"></i> Aplicar
+                                    </button>
+                                </div>
+                            </div>
+                            
                             <div class="table-container">
                                 <table class="data-table" id="table-config-plans">
                                     <thead>
@@ -593,7 +617,7 @@
         <div class="invoice-container">
             <!-- TecnoWork Header -->
             <div class="invoice-header" style="margin-bottom: 12px; display: flex; justify-content: center; width: 100%;">
-                <img src="img/logo.png" alt="TecnoWork" style="display: block; max-height: 55px; width: auto; margin: 0 auto;">
+                <img src="img/logo.png" alt="TecnoWork" style="display: block; max-height: 55px; width: auto; margin: 0 auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;">
                 <span class="pdf-logo-sub" style="display: none;"></span>
             </div>
 
@@ -684,8 +708,8 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
 
     <!-- CUSTOM SCRIPTS -->
-    <script src="js/parser.js?v=1.1"></script>
-    <script src="js/pdfGenerator.js?v=1.1"></script>
-    <script src="js/app.js?v=1.1"></script>
+    <script src="js/parser.js?v=1.2"></script>
+    <script src="js/pdfGenerator.js?v=1.2"></script>
+    <script src="js/app.js?v=1.2"></script>
 </body>
 </html>
