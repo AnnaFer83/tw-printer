@@ -109,14 +109,6 @@ const PDFGenerator = {
         const hasPending = record.machineReadings.some(mr => mr.isPending);
         clone.querySelector('.pdf-grand-total').innerText = this.formatNumber(record.totalGeneral) + (hasPending ? ' (Pte)' : '');
 
-        // Notas al pie
-        const noteEl = clone.querySelector('#pdf-val-notes');
-        if (record.observations && record.observations.trim() !== "") {
-            noteEl.innerText = record.observations;
-            noteEl.parentElement.style.display = 'block';
-        } else {
-            noteEl.parentElement.style.display = 'none'; // ocultar si está vacío
-        }
 
         // Configuración de html2pdf
         const periodFormatted = `${record.periodMonth}_${record.periodYear}`;
