@@ -1000,7 +1000,7 @@ function setupMultiMachineInputSheet(clientObj) {
     if (existingReading) {
         document.getElementById("entry-notes").value = existingReading.observations || "";
     } else {
-        document.getElementById("entry-notes").value = "";
+        document.getElementById("entry-notes").value = window.generateDefaultObservations ? window.generateDefaultObservations(clientObj) : "";
     }
 
     clientObj.machines.forEach(m => {
@@ -2183,3 +2183,21 @@ function processImportedRawRecords(records, sourceName) {
     showToast(`Se cargaron lecturas de ${clientCount} clientes desde ${sourceName}.`, "success");
     switchTab("dashboard");
 }
+
+window.generateDefaultObservations = function(clientObj) {
+    if (!clientObj || !clientObj.machines || clientObj.machines.length === 0) {
+        return "";
+    }
+    const parts = clientObj.machines.map(m => {
+        if (m.isFixed) {
+            return `${m.name}: Fijo`;
+        } else {
+            const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0 };
+            const copiesFormatted = PDFGenerator.formatNumber(plan.copies);
+            const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : AppState.config.defaultExcessPrice;
+            const excessFormatted = PDFGenerator.formatNumber(excessPrice);
+            return `${m.name}: incluye ${copiesFormatted} copias, exd. $${excessFormatted}`;
+        }
+    });
+    return parts.join(" | ");
+};

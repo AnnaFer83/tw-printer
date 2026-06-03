@@ -47,20 +47,10 @@ const PDFGenerator = {
         } else if (clientObs && clientObs.trim() !== "") {
             displayObs = clientObs;
         } else {
-            if (record.machineReadings && record.machineReadings.length > 0) {
-                const parts = record.machineReadings.map(mr => {
-                    const priceFormatted = mr.planCost ? this.formatNumber(mr.planCost) : "0";
-                    if (mr.isFixed) {
-                        return `${mr.name}: Abono Fijo $${priceFormatted}`;
-                    } else {
-                        const copiesFormatted = mr.planCopies ? this.formatNumber(mr.planCopies) : "0";
-                        const excessFormatted = mr.excessPrice ? this.formatNumber(mr.excessPrice) : "0";
-                        return `${mr.name}: Abono $${priceFormatted} (incluye ${copiesFormatted} copias, exd. $${excessFormatted})`;
-                    }
-                });
-                displayObs = "Detalle: " + parts.join(" | ");
-            } else {
-                displayObs = "Detalle de abono y consumos del período.";
+            const client = AppState.clients.find(c => c.id === record.clientId);
+            displayObs = window.generateDefaultObservations ? window.generateDefaultObservations(client) : "";
+            if (!displayObs) {
+                displayObs = "Detalle de abono y consumos del período";
             }
         }
         clone.querySelector('.pdf-client-observations').innerText = displayObs;
