@@ -23,9 +23,9 @@ const AppState = {
 // Datos por Defecto para Inicializar la Aplicación por primera vez (Caso Real ACLISA)
 const DefaultData = {
     plans: [
-        { id: "p500", name: "Plan 500 Copias", copies: 500, cost: 35000 },
-        { id: "p1000", name: "Plan 1.000 Copias", copies: 1000, cost: 60000 },
-        { id: "p1500", name: "Plan 1.500 Copias", copies: 1500, cost: 85500 } // Ej. de consigna
+        { id: "p500", name: "Plan 500 Copias", copies: 500, cost: 35000, excessPrice: 90 },
+        { id: "p1000", name: "Plan 1.000 Copias", copies: 1000, cost: 60000, excessPrice: 90 },
+        { id: "p1500", name: "Plan 1.500 Copias", copies: 1500, cost: 85500, excessPrice: 90 }
     ],
     clients: [
         {
@@ -201,6 +201,13 @@ async function initApp() {
     const entryYear = document.getElementById("entry-period-year");
     if (entryMonth) entryMonth.value = currentMonthName;
     if (entryYear) entryYear.value = currentYearNum.toString();
+
+    // Garantizar que todos los planes existentes tengan el valor de excedente configurado
+    AppState.plans.forEach(p => {
+        if (p.excessPrice === undefined || p.excessPrice === null) {
+            p.excessPrice = AppState.config.defaultExcessPrice || 90;
+        }
+    });
 
     // Rellenar formulario general de configuración
     document.getElementById("config-default-excess-price").value = AppState.config.defaultExcessPrice;
@@ -513,13 +520,25 @@ function setupEventListeners() {
                 const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
                 const planCopies = plan.copies;
                 const planCost = m.customCost !== null ? m.customCost : plan.cost;
-                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : AppState.config.defaultExcessPrice;
+                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
                 // Fórmulas
                 const consumption = isPending ? 0 : curr - prev;
-                const excess = isPending ? 0 : Math.max(0, consumption - planCopies);
-                const excessCost = isPending ? 0 : excess * excessPrice;
-                const totalCost = isPending ? planCost : planCost + excessCost;
+                let excess = 0;
+                let excessCost = 0;
+                let finalPlanCost = planCost;
+                let totalCost = planCost;
+
+                if (planCopies === 0) {
+                    excess = isPending ? 0 : consumption;
+                    excessCost = isPending ? 0 : consumption * excessPrice;
+                    finalPlanCost = 0;
+                    totalCost = excessCost;
+                } else {
+                    excess = isPending ? 0 : Math.max(0, consumption - planCopies);
+                    excessCost = isPending ? 0 : excess * excessPrice;
+                    totalCost = isPending ? planCost : planCost + excessCost;
+                }
 
                 machineReadings.push({
                     machineId: m.id,
@@ -531,14 +550,14 @@ function setupEventListeners() {
                     planCopies: planCopies,
                     excess: excess,
                     excessPrice: excessPrice,
-                    planCost: planCost,
+                    planCost: finalPlanCost,
                     excessCost: excessCost,
                     totalCost: totalCost,
                     isFixed: false,
                     isPending: isPending
                 });
 
-                totalAbono += planCost;
+                totalAbono += finalPlanCost;
                 totalExcessCost += excessCost;
                 totalGeneral += totalCost;
             }
@@ -593,6 +612,7 @@ function setupEventListeners() {
         const name = document.getElementById("new-plan-name").value.trim();
         const copies = parseInt(document.getElementById("new-plan-copies").value);
         const cost = parseFloat(document.getElementById("new-plan-cost").value);
+        const excessPrice = parseFloat(document.getElementById("new-plan-excess").value) || AppState.config.defaultExcessPrice;
 
         if (AppState.editingPlanId) {
             // Edición
@@ -601,6 +621,7 @@ function setupEventListeners() {
                 AppState.plans[planIdx].name = name;
                 AppState.plans[planIdx].copies = copies;
                 AppState.plans[planIdx].cost = cost;
+                AppState.plans[planIdx].excessPrice = excessPrice;
                 showToast(`Plan "${name}" actualizado.`);
             }
             AppState.editingPlanId = null;
@@ -613,7 +634,8 @@ function setupEventListeners() {
                 id: 'p-' + Date.now(),
                 name: name,
                 copies: copies,
-                cost: cost
+                cost: cost,
+                excessPrice: excessPrice
             };
             AppState.plans.push(newPlan);
             showToast(`Plan "${name}" creado exitosamente.`);
@@ -1088,17 +1110,22 @@ window.recalcMultiSheetPreview = function() {
             if (prevVal === "" || currVal === "") {
                 hasPending = true;
                 document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
-                grandTotal += planCost;
+                grandTotal += planCopies === 0 ? 0 : planCost;
             } else {
                 const prev = parseInt(prevVal) || 0;
                 const curr = parseInt(currVal) || 0;
                 const planCopies = plan.copies;
-                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : AppState.config.defaultExcessPrice;
+                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
                 const consumption = Math.max(0, curr - prev);
-                const excess = Math.max(0, consumption - planCopies);
-                const excessCost = excess * excessPrice;
-                const total = planCost + excessCost;
+                let total = 0;
+                if (planCopies === 0) {
+                    total = consumption * excessPrice;
+                } else {
+                    const excess = Math.max(0, consumption - planCopies);
+                    const excessCost = excess * excessPrice;
+                    total = planCost + excessCost;
+                }
 
                 grandTotal += total;
                 document.getElementById(`total-preview-${m.id}`).innerText = PDFGenerator.formatCurrency(total);
@@ -1136,12 +1163,20 @@ function recalculateAllReadings() {
                 const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
                 mr.planCopies = plan.copies;
                 mr.planCost = m.customCost !== null ? m.customCost : plan.cost;
-                mr.excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : AppState.config.defaultExcessPrice;
+                mr.excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
                 mr.consumption = mr.currCounter - mr.prevCounter;
-                mr.excess = Math.max(0, mr.consumption - mr.planCopies);
-                mr.excessCost = mr.excess * mr.excessPrice;
-                mr.totalCost = mr.planCost + mr.excessCost;
+                
+                if (mr.planCopies === 0) {
+                    mr.excess = mr.consumption;
+                    mr.excessCost = mr.consumption * mr.excessPrice;
+                    mr.planCost = 0;
+                    mr.totalCost = mr.excessCost;
+                } else {
+                    mr.excess = Math.max(0, mr.consumption - mr.planCopies);
+                    mr.excessCost = mr.excess * mr.excessPrice;
+                    mr.totalCost = mr.planCost + mr.excessCost;
+                }
 
                 totalAbono += mr.planCost;
                 totalExcessCost += mr.excessCost;
@@ -1516,14 +1551,18 @@ function renderClientsTable() {
                 const labelFixed = m.isFixed ? `<span class="badge badge-secondary" style="font-size:0.65rem; background-color: rgba(255,255,255,0.1); margin-left: 5px;">Abono Fijo</span>` : '';
                 let planDesc = "-";
                 let costDesc = "-";
+                let defaultExcess = AppState.config.defaultExcessPrice;
                 if (!m.isFixed) {
                     const plan = AppState.plans.find(p => p.id === m.planId);
                     planDesc = plan ? `${plan.name} (${plan.copies} copias)` : "Plan no encontrado";
                     costDesc = m.customCost !== null ? `${PDFGenerator.formatCurrency(m.customCost)} (Pers.)` : (plan ? PDFGenerator.formatCurrency(plan.cost) : "-");
+                    if (plan && plan.excessPrice !== undefined && plan.excessPrice !== null) {
+                        defaultExcess = plan.excessPrice;
+                    }
                 } else {
                     costDesc = m.customCost !== null ? PDFGenerator.formatCurrency(m.customCost) : "-";
                 }
-                const excessPriceCell = !m.isFixed ? (m.customExcessPrice !== null ? PDFGenerator.formatCurrency(m.customExcessPrice) : `Defecto ($${AppState.config.defaultExcessPrice})`) : "-";
+                const excessPriceCell = !m.isFixed ? (m.customExcessPrice !== null ? PDFGenerator.formatCurrency(m.customExcessPrice) : `Defecto ($${defaultExcess})`) : "-";
 
                 machinesHtml += `
                     <tr>
@@ -1587,6 +1626,7 @@ function renderConfigPlansTable() {
             <td style="font-weight:600;">${p.name}</td>
             <td>${PDFGenerator.formatNumber(p.copies)}</td>
             <td>${PDFGenerator.formatCurrency(p.cost)}</td>
+            <td>${PDFGenerator.formatCurrency(p.excessPrice !== undefined && p.excessPrice !== null ? p.excessPrice : AppState.config.defaultExcessPrice)}</td>
             <td class="actions-col">
                 <div class="action-buttons">
                     <button class="btn-icon btn-edit" title="Editar Plan" onclick="editPlan('${p.id}')">
@@ -1927,6 +1967,7 @@ window.editPlan = function(planId) {
     document.getElementById("new-plan-name").value = plan.name;
     document.getElementById("new-plan-copies").value = plan.copies;
     document.getElementById("new-plan-cost").value = plan.cost;
+    document.getElementById("new-plan-excess").value = plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice;
 
     document.getElementById("plan-form-title").innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Editar Plan';
     document.getElementById("btn-submit-plan").innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Cambios';
@@ -2123,21 +2164,33 @@ function processImportedRawRecords(records, sourceName) {
                 const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
                 const planCopies = plan.copies;
                 const planCost = m.customCost !== null ? m.customCost : plan.cost;
-                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : AppState.config.defaultExcessPrice;
+                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
                 // Fórmulas
                 const consumption = isPending ? 0 : currCounter - prevCounter;
-                const excess = isPending ? 0 : Math.max(0, consumption - planCopies);
-                const excessCost = isPending ? 0 : excess * excessPrice;
-                const totalCost = isPending ? planCost : planCost + excessCost;
+                let excess = 0;
+                let excessCost = 0;
+                let finalPlanCost = planCost;
+                let totalCost = planCost;
+
+                if (planCopies === 0) {
+                    excess = isPending ? 0 : consumption;
+                    excessCost = isPending ? 0 : consumption * excessPrice;
+                    finalPlanCost = 0;
+                    totalCost = excessCost;
+                } else {
+                    excess = isPending ? 0 : Math.max(0, consumption - planCopies);
+                    excessCost = isPending ? 0 : excess * excessPrice;
+                    totalCost = isPending ? planCost : planCost + excessCost;
+                }
 
                 machineReadings.push({
                     machineId: m.id, name: m.name, serialNumber: m.serialNumber,
                     prevCounter: prevCounter, currCounter: currCounter, consumption: consumption, planCopies: planCopies,
-                    excess: excess, excessPrice: excessPrice, planCost: planCost, excessCost: excessCost, totalCost: totalCost,
+                    excess: excess, excessPrice: excessPrice, planCost: finalPlanCost, excessCost: excessCost, totalCost: totalCost,
                     isFixed: false, isPending: isPending
                 });
-                totalAbono += planCost;
+                totalAbono += finalPlanCost;
                 totalExcessCost += excessCost;
                 totalGeneral += totalCost;
             }
@@ -2194,7 +2247,7 @@ window.generateDefaultObservations = function(clientObj) {
         } else {
             const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0 };
             const copiesFormatted = PDFGenerator.formatNumber(plan.copies);
-            const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : AppState.config.defaultExcessPrice;
+            const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
             const excessFormatted = PDFGenerator.formatNumber(excessPrice);
             return `${m.name}: incluye ${copiesFormatted} copias, exd. $${excessFormatted}`;
         }
