@@ -255,7 +255,7 @@ async function initApp() {
         });
     }
     
-    // Corregir en readings e inyectar fecha de carga / usuario si faltan
+    // Corregir en readings, inyectar fecha de carga / usuario si faltan, y recalcular abono si planCopies es 0 y se guardó erróneamente en 0
     if (AppState.readings) {
         AppState.readings.forEach(r => {
             if (r.clientName && r.clientName.includes("exedente")) {
@@ -266,14 +266,48 @@ async function initApp() {
                 r.observations = r.observations.replace(/exedente/gi, "excedente");
                 dataModified = true;
             }
+
+            const clientObj = AppState.clients.find(c => c.id === r.clientId);
+            let totalAbono = 0;
+            let totalExcessCost = 0;
+            let totalGeneral = 0;
+            let readingModified = false;
+
             if (r.machineReadings) {
                 r.machineReadings.forEach(mr => {
                     if (mr.name && mr.name.includes("exedente")) {
                         mr.name = mr.name.replace(/exedente/gi, "excedente");
                         dataModified = true;
                     }
+
+                    // Corrección de planCost para planCopies === 0 que fueron guardados con 0
+                    if (!mr.isFixed && mr.planCopies === 0 && mr.planCost === 0 && clientObj) {
+                        const m = clientObj.machines.find(mac => mac.id === mr.machineId);
+                        if (m) {
+                            const plan = AppState.plans.find(p => p.id === m.planId) || { cost: 0 };
+                            const realPlanCost = m.customCost !== null ? m.customCost : plan.cost;
+                            if (realPlanCost > 0) {
+                                mr.planCost = realPlanCost;
+                                mr.totalCost = mr.planCost + mr.excessCost;
+                                readingModified = true;
+                            }
+                        }
+                    }
+
+                    totalAbono += mr.planCost || 0;
+                    totalExcessCost += mr.excessCost || 0;
+                    totalGeneral += mr.totalCost || 0;
                 });
             }
+
+            if (readingModified) {
+                r.totalAbono = totalAbono;
+                r.totalExcessCost = totalExcessCost;
+                r.totalGeneral = totalGeneral;
+                dataModified = true;
+                console.log(`Lectura corregida por migración para cliente: ${r.clientName} - Período: ${r.periodMonth} ${r.periodYear}`);
+            }
+
             if (!r.uploadDate) {
                 r.uploadDate = "03/06/2026 21:00:00";
                 dataModified = true;
