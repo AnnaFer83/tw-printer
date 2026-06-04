@@ -151,15 +151,8 @@
                                 <thead>
                                     <tr>
                                         <th>Cliente</th>
-                                        <th>Equipos</th>
-                                        <th>Mes Anterior</th>
-                                        <th>Mes Actual</th>
-                                        <th>Consumo</th>
-                                        <th>Excedente</th>
-                                        <th>Monto Abono</th>
-                                        <th>Monto Excedente</th>
-                                        <th>Total Factura</th>
-                                        <th class="actions-col">Acciones</th>
+                                        <th>Equipos Asignados</th>
+                                        <th>Resúmenes Cargados (Últimos 12 meses)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="table-readings-body">
@@ -565,6 +558,10 @@
                             <div class="form-group">
                                 <label for="config-company-sub">Subtítulo / Info de Contacto</label>
                                 <input type="text" id="config-company-sub" value="TW - Informes de Consumo de Impresión" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="config-current-user">Usuario / Operador Activo</label>
+                                <input type="text" id="config-current-user" value="Administrador" required>
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">
                                 <i class="fa-solid fa-floppy-disk"></i> Guardar Parámetros

@@ -209,10 +209,16 @@ async function initApp() {
         }
     });
 
+    if (!AppState.config.currentUser) {
+        AppState.config.currentUser = "Administrador";
+    }
+
     // Rellenar formulario general de configuración
     document.getElementById("config-default-excess-price").value = AppState.config.defaultExcessPrice;
     document.getElementById("config-company-name").value = AppState.config.companyName;
     document.getElementById("config-company-sub").value = AppState.config.companySub;
+    const userConfigEl = document.getElementById("config-current-user");
+    if (userConfigEl) userConfigEl.value = AppState.config.currentUser;
 
     // Limpieza ortográfica de los datos cargados para corregir "exedente" -> "excedente" en todo el sistema
     let dataModified = false;
@@ -249,7 +255,7 @@ async function initApp() {
         });
     }
     
-    // Corregir en readings
+    // Corregir en readings e inyectar fecha de carga / usuario si faltan
     if (AppState.readings) {
         AppState.readings.forEach(r => {
             if (r.clientName && r.clientName.includes("exedente")) {
@@ -267,6 +273,14 @@ async function initApp() {
                         dataModified = true;
                     }
                 });
+            }
+            if (!r.uploadDate) {
+                r.uploadDate = "03/06/2026 21:00:00";
+                dataModified = true;
+            }
+            if (!r.user) {
+                r.user = "Administrador";
+                dataModified = true;
             }
         });
     }
@@ -576,7 +590,9 @@ function setupEventListeners() {
             machineReadings: machineReadings,
             totalAbono: totalAbono,
             totalExcessCost: totalExcessCost,
-            totalGeneral: totalGeneral
+            totalGeneral: totalGeneral,
+            uploadDate: new Date().toLocaleString('es-AR'),
+            user: AppState.config.currentUser || "Administrador"
         };
 
         // Reemplazar o insertar en el listado
@@ -667,6 +683,7 @@ function setupEventListeners() {
         AppState.config.defaultExcessPrice = parseFloat(document.getElementById("config-default-excess-price").value) || 90;
         AppState.config.companyName = document.getElementById("config-company-name").value || "LEXORER S.R.L.";
         AppState.config.companySub = document.getElementById("config-company-sub").value || "TW - Informes de Consumo de Impresión";
+        AppState.config.currentUser = document.getElementById("config-current-user").value || "Administrador";
         
         saveConfigToStorage();
         showToast("Configuración general guardada con éxito.", "success");
@@ -1265,6 +1282,19 @@ function populatePlanSelects() {
 /**
  * Obtiene las lecturas filtradas por el mes y año de trabajo activo
  */
+function monthNameToNumber(monthName) {
+    const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    return months.indexOf(monthName.toLowerCase());
+}
+
+function isReadingIn12MonthsWindow(reading, refYear, refMonth) {
+    const rYear = parseInt(reading.periodYear);
+    const rMonth = monthNameToNumber(reading.periodMonth);
+    if (rMonth === -1 || isNaN(rYear)) return false;
+    const diff = (refYear - rYear) * 12 + (refMonth - rMonth);
+    return diff >= 0 && diff < 12;
+}
+
 function getFilteredReadings() {
     const reportMonthEl = document.getElementById("report-period-month");
     const reportYearEl = document.getElementById("report-period-year");
@@ -1279,22 +1309,39 @@ function getFilteredReadings() {
     );
 }
 
-/**
- * Renderiza la lista de consumos del Dashboard
- */
 function renderReadingsTable() {
     const tbody = document.getElementById("table-readings-body");
     tbody.innerHTML = "";
 
-    const readings = getFilteredReadings();
+    const reportMonthEl = document.getElementById("report-period-month");
+    const reportYearEl = document.getElementById("report-period-year");
+    if (!reportMonthEl || !reportYearEl) return;
 
-    if (readings.length === 0) {
+    const refMonthName = reportMonthEl.value;
+    const refYear = parseInt(reportYearEl.value) || 2026;
+    const refMonth = monthNameToNumber(refMonthName);
+
+    // Filtrar lecturas en la ventana de 12 meses (inclusive, hacia atrás)
+    const visibleReadings = AppState.readings.filter(r => isReadingIn12MonthsWindow(r, refYear, refMonth));
+
+    // Agrupar lecturas por cliente
+    const readingsByClient = {};
+    visibleReadings.forEach(r => {
+        if (!readingsByClient[r.clientId]) {
+            readingsByClient[r.clientId] = [];
+        }
+        readingsByClient[r.clientId].push(r);
+    });
+
+    const clientsWithReadings = AppState.clients.filter(c => readingsByClient[c.id] && readingsByClient[c.id].length > 0);
+
+    if (clientsWithReadings.length === 0) {
         tbody.innerHTML = `
             <tr class="empty-state-row">
-                <td colspan="10">
+                <td colspan="3">
                     <div class="empty-state">
                         <i class="fa-solid fa-folder-open"></i>
-                        <p>No hay lecturas cargadas para este período.</p>
+                        <p>No hay resúmenes de consumo cargados en los últimos 12 meses.</p>
                         <p class="sub-text">Carga contadores desde "Cargar Datos" o registra en el formulario rápido.</p>
                     </div>
                 </td>
@@ -1303,171 +1350,222 @@ function renderReadingsTable() {
         return;
     }
 
-    const sorted = [...readings].sort((a,b) => a.clientName.localeCompare(b.clientName));
+    const sortedClients = [...clientsWithReadings].sort((a, b) => a.name.localeCompare(b.name));
 
-    sorted.forEach(r => {
-        // Sumar consumo
-        let sumPrev = 0, sumCurr = 0, sumCons = 0, sumExc = 0;
-        let anyPending = false;
-        let allPending = true;
-        let nonFixedCount = 0;
-
-        r.machineReadings.forEach(mr => {
-            if (!mr.isFixed) {
-                nonFixedCount++;
-                if (mr.isPending) {
-                    anyPending = true;
-                } else {
-                    allPending = false;
-                    sumPrev += mr.prevCounter;
-                    sumCurr += mr.currCounter;
-                    sumCons += mr.consumption;
-                    sumExc += mr.excess;
-                }
-            }
+    sortedClients.forEach(c => {
+        const clientReadings = readingsByClient[c.id];
+        
+        // Ordenar lecturas por fecha descendente (más recientes primero)
+        const sortedReadings = [...clientReadings].sort((a, b) => {
+            const diffYear = parseInt(b.periodYear) - parseInt(a.periodYear);
+            if (diffYear !== 0) return diffYear;
+            return monthNameToNumber(b.periodMonth) - monthNameToNumber(a.periodMonth);
         });
 
-        if (nonFixedCount === 0) {
-            allPending = false;
-        }
-
-        // Celdas formateadas con badges de advertencia si están pendientes
-        const pteBadge = ' <span class="badge badge-warning" style="font-size:0.65rem; padding:1px 4px; border-radius:3px;">Pte</span>';
-        
-        const prevCell = allPending ? '<span class="text-danger" style="font-weight:600;">Pendiente</span>' : (PDFGenerator.formatNumber(sumPrev) + (anyPending ? pteBadge : ''));
-        const currCell = allPending ? '<span class="text-danger" style="font-weight:600;">Pendiente</span>' : (PDFGenerator.formatNumber(sumCurr) + (anyPending ? pteBadge : ''));
-        const consCell = allPending ? '<span class="text-danger" style="font-weight:600;">Pendiente</span>' : (PDFGenerator.formatNumber(sumCons) + (anyPending ? pteBadge : ''));
-        const excCell = allPending ? '<span class="text-danger" style="font-weight:600;">Pendiente</span>' : (PDFGenerator.formatNumber(sumExc) + (anyPending ? pteBadge : ''));
-        const totalCell = PDFGenerator.formatCurrency(r.totalGeneral) + (anyPending ? pteBadge : '');
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td style="font-weight:600; cursor: pointer;" onclick="toggleRowExpand('${r.id}')">
-                <i id="icon-expand-${r.id}" class="fa-solid fa-chevron-down" style="margin-right: 8px; color: var(--text-muted); transition: transform 0.2s; display: inline-block;"></i>
-                ${r.clientName}
+        // Fila principal del cliente
+        const clientTr = document.createElement("tr");
+        clientTr.className = "client-group-row";
+        clientTr.style.cursor = "pointer";
+        clientTr.style.backgroundColor = "rgba(51, 65, 85, 0.15)";
+        clientTr.innerHTML = `
+            <td style="font-weight: 600; padding: 12px 15px;" onclick="toggleClientExpand('${c.id}')">
+                <i id="icon-client-${c.id}" class="fa-solid fa-chevron-right" style="margin-right: 10px; color: var(--text-muted); transition: transform 0.2s; display: inline-block;"></i>
+                ${c.name}
             </td>
-            <td>
-                <span class="badge badge-info cursor-pointer" onclick="toggleRowExpand('${r.id}')">
-                    ${r.machineReadings.length} equipos
-                </span>
+            <td style="padding: 12px 15px;" onclick="toggleClientExpand('${c.id}')">
+                <span class="badge badge-info" style="font-size:0.75rem; padding: 3px 6px;">${c.machines.length} equipos</span>
             </td>
-            <td>${prevCell}</td>
-            <td>${currCell}</td>
-            <td>${consCell}</td>
-            <td style="font-weight: 600; color: ${sumExc > 0 && !allPending ? 'var(--color-warning)' : 'var(--text-secondary)'}">${excCell}</td>
-            <td>${PDFGenerator.formatCurrency(r.totalAbono)}</td>
-            <td>${PDFGenerator.formatCurrency(r.totalExcessCost)}</td>
-            <td style="font-weight: 700; color: var(--color-success);">${totalCell}</td>
-            <td class="actions-col">
-                <div class="action-buttons">
-                    <button class="btn-icon btn-pdf" title="Descargar PDF" onclick="downloadClientPDF('${r.id}')">
-                        <i class="fa-solid fa-file-pdf"></i>
-                    </button>
-                    <button class="btn-icon btn-wsp" title="Enviar WhatsApp" onclick="shareWhatsApp('${r.id}')">
-                        <i class="fa-brands fa-whatsapp"></i>
-                    </button>
-                    <button class="btn-icon btn-delete" title="Borrar Registro" onclick="deleteReading('${r.id}')">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
-                </div>
+            <td style="padding: 12px 15px;" onclick="toggleClientExpand('${c.id}')">
+                <span class="badge badge-secondary" style="font-size:0.75rem; padding: 3px 6px;">${clientReadings.length} resúmenes</span>
             </td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(clientTr);
 
-        // Crear Fila de Detalle por Equipo
-        const detailsTr = document.createElement("tr");
-        detailsTr.id = `details-${r.id}`;
-        detailsTr.className = "details-row hidden";
+        // Fila colapsable de períodos
+        const periodsTr = document.createElement("tr");
+        periodsTr.id = `periods-row-${c.id}`;
+        periodsTr.className = "periods-row hidden";
         
-        let detailsHtml = `
-            <td colspan="10" style="padding: 12px 20px;">
-                <div class="details-container">
-                    <h4 style="margin-bottom: 12px; color: var(--color-cyan); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing:0.5px;">
-                        Detalle por Equipo - ${r.clientName}
-                    </h4>
-                    <table class="details-table">
+        let periodsHtml = `
+            <td colspan="3" style="padding: 10px 15px 15px 30px; background-color: rgba(15, 23, 42, 0.15);">
+                <div style="border-left: 2px solid var(--color-cyan); padding-left: 15px; margin: 5px 0;">
+                    <table class="periods-table">
                         <thead>
-                            <tr>
-                                <th>Máquina / Equipo</th>
-                                <th>Mes Anterior</th>
-                                <th>Mes Actual</th>
-                                <th>Consumo</th>
-                                <th>Excedente</th>
-                                <th>Monto Abono</th>
-                                <th>Monto Excedente</th>
-                                <th>Total</th>
+                            <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem;">
+                                <th style="text-align: left; padding: 8px 10px;">Período</th>
+                                <th style="text-align: right; padding: 8px 10px;">Consumo Total</th>
+                                <th style="text-align: right; padding: 8px 10px;">Monto Abono</th>
+                                <th style="text-align: right; padding: 8px 10px;">Monto Excedente</th>
+                                <th style="text-align: right; padding: 8px 10px;">Total Factura</th>
+                                <th style="text-align: left; padding: 8px 10px;">Fecha Carga</th>
+                                <th style="text-align: left; padding: 8px 10px;">Operador</th>
+                                <th style="text-align: right; padding: 8px 10px; width: 140px;">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
         `;
 
-        r.machineReadings.forEach(mr => {
-            if (mr.isFixed) {
-                detailsHtml += `
-                    <tr>
-                        <td>${mr.name} <span class="badge badge-secondary" style="font-size:0.65rem; padding: 1px 4px; border-radius:3px; background-color: rgba(255,255,255,0.1); margin-left: 5px;">Abono Fijo</span></td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>-</td>
-                        <td>${PDFGenerator.formatCurrency(mr.planCost)}</td>
-                        <td>-</td>
-                        <td style="font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
-                    </tr>
-                `;
-            } else if (mr.isPending) {
-                detailsHtml += `
-                    <tr>
-                        <td>${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''} <span class="badge badge-danger" style="font-size:0.65rem; padding: 1px 4px; border-radius:3px; background-color: rgba(220,38,38,0.2); color: #ef4444; margin-left: 5px;">Pendiente</span></td>
-                        <td class="text-danger" style="font-weight:600;">Pendiente</td>
-                        <td class="text-danger" style="font-weight:600;">Pendiente</td>
-                        <td class="text-danger" style="font-weight:600;">Pendiente</td>
-                        <td class="text-danger" style="font-weight:600;">Pendiente</td>
-                        <td>${PDFGenerator.formatCurrency(mr.planCost)}</td>
-                        <td class="text-danger" style="font-weight:600;">Pendiente</td>
-                        <td style="font-weight: 600; color: var(--color-warning);">${PDFGenerator.formatCurrency(mr.totalCost)} (Abono)</td>
-                    </tr>
-                `;
-            } else {
-                detailsHtml += `
-                    <tr>
-                        <td>${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
-                        <td>${PDFGenerator.formatNumber(mr.prevCounter)}</td>
-                        <td>${PDFGenerator.formatNumber(mr.currCounter)}</td>
-                        <td>${PDFGenerator.formatNumber(mr.consumption)}</td>
-                        <td style="font-weight: 600; color: ${mr.excess > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(mr.excess)}</td>
-                        <td>${PDFGenerator.formatCurrency(mr.planCost)}</td>
-                        <td>${PDFGenerator.formatCurrency(mr.excessCost)}</td>
-                        <td style="font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
-                    </tr>
-                `;
-            }
+        sortedReadings.forEach(r => {
+            // Calcular consumo
+            let sumCons = 0;
+            let anyPending = false;
+            r.machineReadings.forEach(mr => {
+                if (!mr.isFixed) {
+                    if (mr.isPending) {
+                        anyPending = true;
+                    } else {
+                        sumCons += mr.consumption;
+                    }
+                }
+            });
+
+            const pteBadge = ' <span class="badge badge-warning" style="font-size:0.65rem; padding:1px 4px; border-radius:3px;">Pte</span>';
+            const consCell = anyPending ? `<span class="text-danger" style="font-weight:600;">Pendiente</span>` : (PDFGenerator.formatNumber(sumCons) + (anyPending ? pteBadge : ''));
+            const totalCell = PDFGenerator.formatCurrency(r.totalGeneral) + (anyPending ? pteBadge : '');
+
+            // Fila de período
+            periodsHtml += `
+                <tr class="period-item-row" onclick="togglePeriodExpand('${r.id}')" style="cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 10px; font-weight: 600; color: var(--text-primary);">
+                        <i id="icon-period-${r.id}" class="fa-solid fa-chevron-right" style="margin-right: 8px; color: var(--text-muted); transition: transform 0.2s; display: inline-block;"></i>
+                        ${r.periodMonth} ${r.periodYear}
+                    </td>
+                    <td style="text-align: right; padding: 10px;">${consCell}</td>
+                    <td style="text-align: right; padding: 10px;">${PDFGenerator.formatCurrency(r.totalAbono)}</td>
+                    <td style="text-align: right; padding: 10px;">${PDFGenerator.formatCurrency(r.totalExcessCost)}</td>
+                    <td style="text-align: right; padding: 10px; font-weight: 700; color: var(--color-success);">${totalCell}</td>
+                    <td style="padding: 10px; color: var(--text-muted); font-size: 0.8rem;">${r.uploadDate || '-'}</td>
+                    <td style="padding: 10px; color: var(--text-muted); font-size: 0.8rem;">${r.user || '-'}</td>
+                    <td style="text-align: right; padding: 10px;" onclick="event.stopPropagation();">
+                        <div class="action-buttons" style="justify-content: flex-end;">
+                            <button class="btn-icon btn-pdf" title="Descargar PDF" onclick="downloadClientPDF('${r.id}')">
+                                <i class="fa-solid fa-file-pdf"></i>
+                            </button>
+                            <button class="btn-icon btn-wsp" title="Enviar WhatsApp" onclick="shareWhatsApp('${r.id}')">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </button>
+                            <button class="btn-icon btn-delete" title="Borrar Registro" onclick="deleteReading('${r.id}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            // Fila colapsable de detalles por equipo del período
+            let detailsHtml = `
+                <tr id="details-period-${r.id}" class="period-details-row hidden">
+                    <td colspan="8" style="padding: 12px 15px 12px 25px; background-color: rgba(0,0,0,0.15);">
+                        <div class="details-container" style="border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background: rgba(15,23,42,0.6);">
+                            <h4 style="margin-bottom: 12px; color: var(--color-cyan); font-size: 0.8rem; font-weight: 700; text-transform: uppercase;">
+                                Detalle por Equipo - ${r.clientName} (${r.periodMonth} ${r.periodYear})
+                            </h4>
+                            <table class="details-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left; padding: 6px 10px;">Máquina / Equipo</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Mes Anterior</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Mes Actual</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Consumo</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Excedente</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Monto Abono</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Monto Excedente</th>
+                                        <th style="text-align: right; padding: 6px 10px;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+
+            r.machineReadings.forEach(mr => {
+                if (mr.isFixed) {
+                    detailsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} <span class="badge badge-secondary" style="font-size:0.65rem; padding: 1px 4px; border-radius:3px; background-color: rgba(255,255,255,0.1); margin-left: 5px;">Abono Fijo</span></td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
+                        </tr>
+                    `;
+                } else if (mr.isPending) {
+                    detailsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''} <span class="badge badge-danger" style="font-size:0.65rem; padding: 1px 4px; border-radius:3px; background-color: rgba(220,38,38,0.2); color: #ef4444; margin-left: 5px;">Pendiente</span></td>
+                            <td style="text-align: right; padding: 8px 10px; color: #ef4444; font-weight:600;">Pendiente</td>
+                            <td style="text-align: right; padding: 8px 10px; color: #ef4444; font-weight:600;">Pendiente</td>
+                            <td style="text-align: right; padding: 8px 10px; color: #ef4444; font-weight:600;">Pendiente</td>
+                            <td style="text-align: right; padding: 8px 10px; color: #ef4444; font-weight:600;">Pendiente</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px; color: #ef4444; font-weight:600;">Pendiente</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-warning);">${PDFGenerator.formatCurrency(mr.totalCost)} (Abono)</td>
+                        </tr>
+                    `;
+                } else {
+                    detailsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevCounter)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currCounter)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.consumption)}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${mr.excess > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(mr.excess)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.excessCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            detailsHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            periodsHtml += detailsHtml;
         });
 
-        detailsHtml += `
+        periodsHtml += `
                         </tbody>
                     </table>
                 </div>
             </td>
         `;
-        detailsTr.innerHTML = detailsHtml;
-        tbody.appendChild(detailsTr);
+        periodsTr.innerHTML = periodsHtml;
+        tbody.appendChild(periodsTr);
     });
 }
 
-/**
- * Función global para expandir o colapsar detalles de equipos por cliente
- */
-window.toggleRowExpand = function(readingId) {
-    const detailRow = document.getElementById(`details-${readingId}`);
-    const icon = document.getElementById(`icon-expand-${readingId}`);
+window.toggleClientExpand = function(clientId) {
+    const periodRow = document.getElementById(`periods-row-${clientId}`);
+    const icon = document.getElementById(`icon-client-${clientId}`);
+    if (periodRow) {
+        periodRow.classList.toggle("hidden");
+        if (icon) {
+            if (periodRow.classList.contains("hidden")) {
+                icon.style.transform = "rotate(0deg)";
+            } else {
+                icon.style.transform = "rotate(90deg)";
+            }
+        }
+    }
+};
+
+window.togglePeriodExpand = function(readingId) {
+    const detailRow = document.getElementById(`details-period-${readingId}`);
+    const icon = document.getElementById(`icon-period-${readingId}`);
     if (detailRow) {
         detailRow.classList.toggle("hidden");
         if (icon) {
             if (detailRow.classList.contains("hidden")) {
                 icon.style.transform = "rotate(0deg)";
             } else {
-                icon.style.transform = "rotate(180deg)";
+                icon.style.transform = "rotate(90deg)";
             }
         }
     }
@@ -2215,7 +2313,9 @@ function processImportedRawRecords(records, sourceName) {
             machineReadings: machineReadings,
             totalAbono: totalAbono,
             totalExcessCost: totalExcessCost,
-            totalGeneral: totalGeneral
+            totalGeneral: totalGeneral,
+            uploadDate: new Date().toLocaleString('es-AR'),
+            user: AppState.config.currentUser || "Administrador"
         };
 
         const existingIdx = AppState.readings.findIndex(r => 

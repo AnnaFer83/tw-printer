@@ -1241,6 +1241,37 @@ body.light-mode .drop-zone-loader {
     border-bottom: none;
 }
 
+/* Historial de períodos en el dashboard */
+.periods-row {
+    background-color: rgba(15, 23, 42, 0.3) !important;
+}
+.periods-row.hidden {
+    display: none !important;
+}
+.periods-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.periods-table th {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-muted);
+}
+.periods-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.period-item-row:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+.period-details-row {
+    background-color: rgba(0, 0, 0, 0.2) !important;
+}
+.period-details-row.hidden {
+    display: none !important;
+}
+
 .cursor-pointer {
     cursor: pointer;
 }
