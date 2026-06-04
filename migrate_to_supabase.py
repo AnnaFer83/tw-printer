@@ -28,7 +28,8 @@ JSON_FILE = args.json
 # Credenciales Supabase (se piden al ejecutar para no guardarlas en el código)
 # ---------------------------------------------------------------------------
 SUPABASE_URL = "https://sngigxlfemzteyokqlbd.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuZ2lneGxmZW16dGV5b2txbGJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NDg0NTAsImV4cCI6MjA5NjEyNDQ1MH0.K-EreESHk-JjB3cZNDDJCENVSDJuKYJzUMLF78h-zkc"
+# service_role key — bypasea RLS, solo para este script de migración (nunca va al browser)
+SUPABASE_KEY = "SERVICE_ROLE_KEY"  # reemplazar con la clave real antes de ejecutar (no commitear)
 
 print("\n=== Migración TecnoWork → Supabase ===")
 print(f"Proyecto: {SUPABASE_URL}\n")
@@ -82,8 +83,19 @@ def sb(method, table, body=None, params="", extra_headers=None):
         return False, str(e)
 
 
+# Clave primaria por tabla (para construir el filtro de DELETE correcto)
+TABLE_PK = {
+    "config":           "key",
+    "plans":            "id",
+    "clients":          "id",
+    "machines":         "id",
+    "readings":         "id",
+    "machine_readings": "id",
+}
+
 def delete_all(table):
-    ok, msg = sb("DELETE", table, params="?id=not.is.null")
+    pk = TABLE_PK.get(table, "id")
+    ok, msg = sb("DELETE", table, params=f"?{pk}=not.is.null")
     if not ok:
         print(f"  ⚠  Error borrando {table}: {msg}")
     return ok
