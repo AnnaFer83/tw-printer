@@ -1,0 +1,1084 @@
+{
+    "clients": [
+        {
+            "id": "c-aclisa",
+            "name": "ACLISA",
+            "phone": "5491133334444",
+            "observations": "Plan BYN 1500 impresoras y multifunción Ricoh 3710 y Xerox B405 incluye 1500 impresiones - Excedente $ 90",
+            "machines": [
+                {
+                    "id": "m1",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715415312",
+                    "planId": "p1500",
+                    "customCost": 94575,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m3",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160z931098",
+                    "planId": "p1500",
+                    "customCost": 45500,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m4",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31605",
+                    "planId": "p1500",
+                    "customCost": 45500,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m5",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31592",
+                    "planId": "p1500",
+                    "customCost": 45500,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m6",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31588",
+                    "planId": "p1500",
+                    "customCost": 45500,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m7",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5169zc31251",
+                    "planId": "p1500",
+                    "customCost": 45500,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m8",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31487",
+                    "planId": "p1500",
+                    "customCost": 45500,
+                    "customExcessPrice": 90,
+                    "isFixed": false
+                },
+                {
+                    "id": "m-1780540127592-42",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160z931111",
+                    "isFixed": false,
+                    "planId": "p-1780521636140",
+                    "customCost": 45500,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780540385873-42",
+                    "name": "RICOH 3710 SF",
+                    "serialNumber": "5170z630103",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 54600,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780540413293-94",
+                    "name": "Scanner HP x 4",
+                    "serialNumber": "0",
+                    "isFixed": false,
+                    "planId": "p-1780439416066",
+                    "customCost": 187200,
+                    "customExcessPrice": null
+                }
+            ]
+        },
+        {
+            "id": "c-1780356359447",
+            "name": "Instituto Santa Rita",
+            "phone": "",
+            "observations": "Plan BYN 1000 impresoras  Ricoh 3710  incluye 1000 impresiones  - Exedente $ 90",
+            "machines": [
+                {
+                    "id": "m-1780356527516-16",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z630422",
+                    "isFixed": false,
+                    "planId": "p1000",
+                    "customCost": 67600,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780439667092",
+            "name": "PONTE PROPIEDADES",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780439663470-56",
+                    "name": "RICOH MP 501",
+                    "serialNumber": "G986XC23512",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 149240,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780439797654",
+            "name": "CREDITOS HOY SA",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780439754780-45",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W918P500969",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 98020,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780439794076-96",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715418567",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 98020,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780531104593",
+            "name": "MEPROA",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780531064963-65",
+                    "name": "HP E72522",
+                    "serialNumber": "CNB8K40RX",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 246220,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780531100656-47",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W918P501046",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 98020,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780533833283",
+            "name": "Medicab",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780533420648-16",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z630118",
+                    "isFixed": false,
+                    "planId": "p-1780521636140",
+                    "customCost": 69030,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780533577796-25",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170ZC32692",
+                    "isFixed": false,
+                    "planId": "p-1780521636140",
+                    "customCost": 69030,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780533628474-56",
+                    "name": "HP Pagewide",
+                    "serialNumber": "CN24D8502W",
+                    "isFixed": false,
+                    "planId": "p-1780521793607",
+                    "customCost": 338169,
+                    "customExcessPrice": 234
+                },
+                {
+                    "id": "m-1780533734230-69",
+                    "name": "HP 7740 A3 con sist. cont. y Pc",
+                    "serialNumber": "CN32A9HGRD",
+                    "isFixed": false,
+                    "planId": "p-1780521963602",
+                    "customCost": 457158,
+                    "customExcessPrice": 1300
+                },
+                {
+                    "id": "m-1780533773189-13",
+                    "name": "Canon G3100",
+                    "serialNumber": "KLYS33544",
+                    "isFixed": false,
+                    "planId": "p-1780522106711",
+                    "customCost": 97500,
+                    "customExcessPrice": 325
+                },
+                {
+                    "id": "m-1780533828664-92",
+                    "name": "HP 7740 A3 con sist. cont.",
+                    "serialNumber": "CN84OHY04K",
+                    "isFixed": false,
+                    "planId": "p-1780522221211",
+                    "customCost": 338169,
+                    "customExcessPrice": 234
+                }
+            ]
+        },
+        {
+            "id": "c-1780539083459",
+            "name": "RPM Automotores",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780539073700-53",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z730490",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 81200,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780539341377",
+            "name": "FS XXI",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780539339508-36",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170ZC1166",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 83800,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780539526654",
+            "name": "NEFROLOGIA",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780539524894-30",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W911P100690",
+                    "isFixed": false,
+                    "planId": "p1500",
+                    "customCost": 98100,
+                    "customExcessPrice": 90
+                }
+            ]
+        },
+        {
+            "id": "c-1780541464982",
+            "name": "NEOFORM SRL",
+            "phone": "",
+            "observations": "",
+            "machines": [
+                {
+                    "id": "m-1780541383534-75",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715419261",
+                    "isFixed": false,
+                    "planId": "p-1780521636140",
+                    "customCost": 98020,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780541421029-52",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170zc31169",
+                    "isFixed": false,
+                    "planId": "p-1780521636140",
+                    "customCost": 82420,
+                    "customExcessPrice": 90
+                },
+                {
+                    "id": "m-1780541462253-73",
+                    "name": "Ricoh 3710 dn",
+                    "serialNumber": "168z30029",
+                    "isFixed": false,
+                    "planId": "p-1780521636140",
+                    "customCost": 61100,
+                    "customExcessPrice": 90
+                }
+            ]
+        }
+    ],
+    "plans": [
+        {
+            "id": "p500",
+            "name": "Plan ByN 500",
+            "copies": 500,
+            "cost": 35000,
+            "excessPrice": 90
+        },
+        {
+            "id": "p1000",
+            "name": "Plan ByN 1.000",
+            "copies": 1000,
+            "cost": 60000,
+            "excessPrice": 90
+        },
+        {
+            "id": "p1500",
+            "name": "Plan ByN 1500",
+            "copies": 1500,
+            "cost": 85500,
+            "excessPrice": 90
+        },
+        {
+            "id": "p-1780439416066",
+            "name": "Plan CPC",
+            "copies": 10000,
+            "cost": 187200,
+            "excessPrice": 90
+        },
+        {
+            "id": "p-1780521636140",
+            "name": "Plan ByN 1500",
+            "copies": 1500,
+            "cost": 69030,
+            "excessPrice": 90
+        },
+        {
+            "id": "p-1780521793607",
+            "name": "HP Pagewide",
+            "copies": 0,
+            "cost": 338169,
+            "excessPrice": 234
+        },
+        {
+            "id": "p-1780521963602",
+            "name": "HP 7740  A3 con PC completa",
+            "copies": 0,
+            "cost": 457158,
+            "excessPrice": 1300
+        },
+        {
+            "id": "p-1780522106711",
+            "name": "Plan Canon Color",
+            "copies": 0,
+            "cost": 97500,
+            "excessPrice": 325
+        },
+        {
+            "id": "p-1780522221211",
+            "name": "HP 7740 A3 sist. cont.",
+            "copies": 0,
+            "cost": 338169,
+            "excessPrice": 234
+        }
+    ],
+    "readings": [
+        {
+            "id": "r-c-1780356359447",
+            "clientId": "c-1780356359447",
+            "clientName": "Instituto Santa Rita",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1.000 Ricoh 3710 SF, 1.000 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780356527516-16",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z630422",
+                    "prevCounter": 94368,
+                    "currCounter": 98193,
+                    "consumption": 3825,
+                    "planCopies": 1000,
+                    "excess": 2825,
+                    "excessPrice": 90,
+                    "planCost": 67600,
+                    "excessCost": 254250,
+                    "totalCost": 321850,
+                    "isFixed": false
+                }
+            ],
+            "totalAbono": 67600,
+            "totalExcessCost": 254250,
+            "totalGeneral": 321850,
+            "uploadDate": "03/06/2026 21:00:00",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780356359447-mayo-2026",
+            "clientId": "c-1780356359447",
+            "clientName": "Instituto Santa Rita",
+            "periodMonth": "Mayo",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1.000 Ricoh 3710 SF, 1.000 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780356527516-16",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z630422",
+                    "prevCounter": 94368,
+                    "currCounter": 98193,
+                    "consumption": 3825,
+                    "planCopies": 1000,
+                    "excess": 2825,
+                    "excessPrice": 90,
+                    "planCost": 67600,
+                    "excessCost": 254250,
+                    "totalCost": 321850,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 67600,
+            "totalExcessCost": 254250,
+            "totalGeneral": 321850,
+            "uploadDate": "03/06/2026 21:00:00",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780439797654-mayo-2026",
+            "clientId": "c-1780439797654",
+            "clientName": "CREDITOS HOY SA",
+            "periodMonth": "Mayo",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 RICOH MP 301, 1.500 impresiones o copias (no acumulables) exc. $90 - Plan ByN 1500 XEROX B405, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780439754780-45",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W918P500969",
+                    "prevCounter": 81963,
+                    "currCounter": 82391,
+                    "consumption": 428,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 98020,
+                    "excessCost": 0,
+                    "totalCost": 98020,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780439794076-96",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715418567",
+                    "prevCounter": 83785,
+                    "currCounter": 86743,
+                    "consumption": 2958,
+                    "planCopies": 1500,
+                    "excess": 1458,
+                    "excessPrice": 90,
+                    "planCost": 98020,
+                    "excessCost": 131220,
+                    "totalCost": 229240,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 196040,
+            "totalExcessCost": 131220,
+            "totalGeneral": 327260,
+            "uploadDate": "03/06/2026 21:00:00",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780439667092-junio-2026",
+            "clientId": "c-1780439667092",
+            "clientName": "PONTE PROPIEDADES",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 RICOH MP 501, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780439663470-56",
+                    "name": "RICOH MP 501",
+                    "serialNumber": "G986XC23512",
+                    "prevCounter": 229211,
+                    "currCounter": 231377,
+                    "consumption": 2166,
+                    "planCopies": 1500,
+                    "excess": 666,
+                    "excessPrice": 90,
+                    "planCost": 149240,
+                    "excessCost": 59940,
+                    "totalCost": 209180,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 149240,
+            "totalExcessCost": 59940,
+            "totalGeneral": 209180,
+            "uploadDate": "03/06/2026 21:00:00",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780439797654-junio-2026",
+            "clientId": "c-1780439797654",
+            "clientName": "CREDITOS HOY SA",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 RICOH MP 301, 1.500 impresiones o copias (no acumulables) exc. $90 - Plan ByN 1500 XEROX B405, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780439754780-45",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W918P500969",
+                    "prevCounter": 81963,
+                    "currCounter": 82391,
+                    "consumption": 428,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 98020,
+                    "excessCost": 0,
+                    "totalCost": 98020,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780439794076-96",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715418567",
+                    "prevCounter": 83785,
+                    "currCounter": 86743,
+                    "consumption": 2958,
+                    "planCopies": 1500,
+                    "excess": 1458,
+                    "excessPrice": 90,
+                    "planCost": 98020,
+                    "excessCost": 131220,
+                    "totalCost": 229240,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 196040,
+            "totalExcessCost": 131220,
+            "totalGeneral": 327260,
+            "uploadDate": "03/06/2026 21:00:00",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780531104593-junio-2026",
+            "clientId": "c-1780531104593",
+            "clientName": "MEPROA",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 HP E72522, 1.500 impresiones o copias (no acumulables) exc. $90 - Plan ByN 1500 RICOH MP 301, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780531064963-65",
+                    "name": "HP E72522",
+                    "serialNumber": "CNB8K40RX",
+                    "prevCounter": 357623,
+                    "currCounter": 373051,
+                    "consumption": 15428,
+                    "planCopies": 1500,
+                    "excess": 13928,
+                    "excessPrice": 90,
+                    "planCost": 246220,
+                    "excessCost": 1253520,
+                    "totalCost": 1499740,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780531100656-47",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W918P501046",
+                    "prevCounter": 200024,
+                    "currCounter": 202993,
+                    "consumption": 2969,
+                    "planCopies": 1500,
+                    "excess": 1469,
+                    "excessPrice": 90,
+                    "planCost": 98020,
+                    "excessCost": 132210,
+                    "totalCost": 230230,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 344240,
+            "totalExcessCost": 1385730,
+            "totalGeneral": 1729970,
+            "uploadDate": "03/06/2026 21:00:00",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780533833283-junio-2026",
+            "clientId": "c-1780533833283",
+            "clientName": "Medicab",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "(2) Planes ByN 1500 Ricoh 3710 SF, 1.500 impresiones o copias c/u (no acumulables) exc. $90 - HP Pagewide: cada impresión $234 - HP 7740 A3 con sist. cont. y Pc: cada impresión $1.300 - Canon G3100: cada impresión $325 - HP 7740 A3 con sist. cont.: cada impresión $234.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780533420648-16",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z630118",
+                    "prevCounter": 92310,
+                    "currCounter": 95543,
+                    "consumption": 3233,
+                    "planCopies": 1500,
+                    "excess": 1733,
+                    "excessPrice": 90,
+                    "planCost": 69030,
+                    "excessCost": 155970,
+                    "totalCost": 225000,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780533577796-25",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170ZC32692",
+                    "prevCounter": 162569,
+                    "currCounter": 164744,
+                    "consumption": 2175,
+                    "planCopies": 1500,
+                    "excess": 675,
+                    "excessPrice": 90,
+                    "planCost": 69030,
+                    "excessCost": 60750,
+                    "totalCost": 129780,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780533628474-56",
+                    "name": "HP Pagewide",
+                    "serialNumber": "CN24D8502W",
+                    "prevCounter": 111700,
+                    "currCounter": 116093,
+                    "consumption": 4393,
+                    "planCopies": 0,
+                    "excess": 4393,
+                    "excessPrice": 234,
+                    "planCost": 338169,
+                    "excessCost": 1027962,
+                    "totalCost": 1366131,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780533734230-69",
+                    "name": "HP 7740 A3 con sist. cont. y Pc",
+                    "serialNumber": "CN32A9HGRD",
+                    "prevCounter": 2450,
+                    "currCounter": 2815,
+                    "consumption": 365,
+                    "planCopies": 0,
+                    "excess": 365,
+                    "excessPrice": 1300,
+                    "planCost": 457158,
+                    "excessCost": 474500,
+                    "totalCost": 931658,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780533773189-13",
+                    "name": "Canon G3100",
+                    "serialNumber": "KLYS33544",
+                    "prevCounter": 24239,
+                    "currCounter": 24247,
+                    "consumption": 8,
+                    "planCopies": 0,
+                    "excess": 8,
+                    "excessPrice": 325,
+                    "planCost": 97500,
+                    "excessCost": 2600,
+                    "totalCost": 100100,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780533828664-92",
+                    "name": "HP 7740 A3 con sist. cont.",
+                    "serialNumber": "CN84OHY04K",
+                    "prevCounter": 5999,
+                    "currCounter": 6217,
+                    "consumption": 218,
+                    "planCopies": 0,
+                    "excess": 218,
+                    "excessPrice": 234,
+                    "planCost": 338169,
+                    "excessCost": 51012,
+                    "totalCost": 389181,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 1369056,
+            "totalExcessCost": 1772794,
+            "totalGeneral": 3141850,
+            "uploadDate": "3/6/2026, 09:47:48",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780539083459-junio-2026",
+            "clientId": "c-1780539083459",
+            "clientName": "RPM Automotores",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 Ricoh 3710 SF, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780539073700-53",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170Z730490",
+                    "prevCounter": 64445,
+                    "currCounter": 65281,
+                    "consumption": 836,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 81200,
+                    "excessCost": 0,
+                    "totalCost": 81200,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 81200,
+            "totalExcessCost": 0,
+            "totalGeneral": 81200,
+            "uploadDate": "3/6/2026, 11:12:08",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780539341377-junio-2026",
+            "clientId": "c-1780539341377",
+            "clientName": "FS XXI",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 Ricoh 3710 SF, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780539339508-36",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170ZC1166",
+                    "prevCounter": 87166,
+                    "currCounter": 88463,
+                    "consumption": 1297,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 83800,
+                    "excessCost": 0,
+                    "totalCost": 83800,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 83800,
+            "totalExcessCost": 0,
+            "totalGeneral": 83800,
+            "uploadDate": "3/6/2026, 11:16:28",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780539526654-junio-2026",
+            "clientId": "c-1780539526654",
+            "clientName": "NEFROLOGIA",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 RICOH MP 301, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780539524894-30",
+                    "name": "RICOH MP 301",
+                    "serialNumber": "W911P100690",
+                    "prevCounter": 215856,
+                    "currCounter": 217902,
+                    "consumption": 2046,
+                    "planCopies": 1500,
+                    "excess": 546,
+                    "excessPrice": 90,
+                    "planCost": 98100,
+                    "excessCost": 49140,
+                    "totalCost": 147240,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 98100,
+            "totalExcessCost": 49140,
+            "totalGeneral": 147240,
+            "uploadDate": "3/6/2026, 11:19:37",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-aclisa-junio-2026",
+            "clientId": "c-aclisa",
+            "clientName": "ACLISA",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 XEROX B405, 1.500 impresiones o copias (no acumulables) exc. $90 - (7) Planes ByN 1500 RICOH 3710 dn, 1.500 impresiones o copias c/u (no acumulables) exc. $90 - Plan ByN 1500 RICOH 3710 SF, 1.500 impresiones o copias (no acumulables) exc. $90 - Scanner HP x 4: cada impresión $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m1",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715415312",
+                    "prevCounter": 32961,
+                    "currCounter": 33732,
+                    "consumption": 771,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 94575,
+                    "excessCost": 0,
+                    "totalCost": 94575,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m3",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160z931098",
+                    "prevCounter": 38435,
+                    "currCounter": 38922,
+                    "consumption": 487,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m4",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31605",
+                    "prevCounter": 26109,
+                    "currCounter": 26130,
+                    "consumption": 21,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m5",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31592",
+                    "prevCounter": 58769,
+                    "currCounter": 59944,
+                    "consumption": 1175,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m6",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31588",
+                    "prevCounter": 36380,
+                    "currCounter": 37512,
+                    "consumption": 1132,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m7",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5169zc31251",
+                    "prevCounter": 1752,
+                    "currCounter": 1801,
+                    "consumption": 49,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m8",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160zb31487",
+                    "prevCounter": 27538,
+                    "currCounter": 27653,
+                    "consumption": 115,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780540127592-42",
+                    "name": "RICOH 3710 dn",
+                    "serialNumber": "5160z931111",
+                    "prevCounter": 53456,
+                    "currCounter": 53905,
+                    "consumption": 449,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 45500,
+                    "excessCost": 0,
+                    "totalCost": 45500,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780540385873-42",
+                    "name": "RICOH 3710 SF",
+                    "serialNumber": "5170z630103",
+                    "prevCounter": 29015,
+                    "currCounter": 29303,
+                    "consumption": 288,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 54600,
+                    "excessCost": 0,
+                    "totalCost": 54600,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780540413293-94",
+                    "name": "Scanner HP x 4",
+                    "serialNumber": "0",
+                    "prevCounter": 0,
+                    "currCounter": 0,
+                    "consumption": 0,
+                    "planCopies": 10000,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 187200,
+                    "excessCost": 0,
+                    "totalCost": 187200,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 654875,
+            "totalExcessCost": 0,
+            "totalGeneral": 654875,
+            "uploadDate": "3/6/2026, 11:39:40",
+            "user": "Administrador"
+        },
+        {
+            "id": "r-c-1780541464982-junio-2026",
+            "clientId": "c-1780541464982",
+            "clientName": "NEOFORM SRL",
+            "periodMonth": "Junio",
+            "periodYear": 2026,
+            "observations": "Plan ByN 1500 XEROX B405, 1.500 impresiones o copias (no acumulables) exc. $90 - Plan ByN 1500 Ricoh 3710 SF, 1.500 impresiones o copias (no acumulables) exc. $90 - Plan ByN 1500 Ricoh 3710 dn, 1.500 impresiones o copias (no acumulables) exc. $90.",
+            "machineReadings": [
+                {
+                    "machineId": "m-1780541383534-75",
+                    "name": "XEROX B405",
+                    "serialNumber": "3715419261",
+                    "prevCounter": 96872,
+                    "currCounter": 102142,
+                    "consumption": 5270,
+                    "planCopies": 1500,
+                    "excess": 3770,
+                    "excessPrice": 90,
+                    "planCost": 98020,
+                    "excessCost": 339300,
+                    "totalCost": 437320,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780541421029-52",
+                    "name": "Ricoh 3710 SF",
+                    "serialNumber": "5170zc31169",
+                    "prevCounter": 138351,
+                    "currCounter": 138467,
+                    "consumption": 116,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 82420,
+                    "excessCost": 0,
+                    "totalCost": 82420,
+                    "isFixed": false,
+                    "isPending": false
+                },
+                {
+                    "machineId": "m-1780541462253-73",
+                    "name": "Ricoh 3710 dn",
+                    "serialNumber": "168z30029",
+                    "prevCounter": 102858,
+                    "currCounter": 103909,
+                    "consumption": 1051,
+                    "planCopies": 1500,
+                    "excess": 0,
+                    "excessPrice": 90,
+                    "planCost": 61100,
+                    "excessCost": 0,
+                    "totalCost": 61100,
+                    "isFixed": false,
+                    "isPending": false
+                }
+            ],
+            "totalAbono": 241540,
+            "totalExcessCost": 339300,
+            "totalGeneral": 580840,
+            "uploadDate": "3/6/2026, 11:52:08",
+            "user": "Administrador"
+        }
+    ],
+    "config": {
+        "defaultExcessPrice": 90,
+        "companyName": "LEXORER S.R.L.",
+        "companySub": "TW - Informes de Consumo de Impresión",
+        "currentUser": "Administrador"
+    }
+}

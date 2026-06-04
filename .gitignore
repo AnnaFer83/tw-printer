@@ -6,8 +6,7 @@ Thumbs.db
 *.pdf
 Propuesta_Tecnica_Backend.pdf
 
-# Bases de datos de pruebas locales (se inicializan en el server)
-database.json
+
 
 # Archivos temporales o de cache
 .goutputstream-*
