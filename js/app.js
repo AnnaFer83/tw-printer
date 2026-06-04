@@ -272,7 +272,7 @@ async function initApp() {
             // Regenerar observaciones si tienen el formato viejo, vacío o de carga automática
             if (clientObj) {
                 const currentObs = r.observations || "";
-                if (currentObs === "" || currentObs.includes("sin copias incl.") || currentObs.includes(" | ") || currentObs.startsWith("Carga automática")) {
+                if (currentObs === "" || currentObs.includes("sin copias incl.") || currentObs.includes(" | ") || currentObs.startsWith("Carga automática") || currentObs.includes("excedente por impresión") || currentObs.includes("excedente $")) {
                     const newObs = window.generateDefaultObservations ? window.generateDefaultObservations(clientObj) : "";
                     if (newObs && newObs !== currentObs) {
                         r.observations = newObs;
@@ -2467,18 +2467,18 @@ window.generateDefaultObservations = function(clientObj) {
             const excessFormatted = PDFGenerator.formatNumber(excessPrice);
             if (copies === 0) {
                 if (count > 1) {
-                    parts.push(`(${count}) ${m.name}: excedente por impresión $${excessFormatted}`);
+                    parts.push(`(${count}) ${m.name}: cada impresión $${excessFormatted}`);
                 } else {
-                    parts.push(`${m.name}: excedente por impresión $${excessFormatted}`);
+                    parts.push(`${m.name}: cada impresión $${excessFormatted}`);
                 }
             } else {
                 const copiesFormatted = PDFGenerator.formatNumber(copies);
                 const namePart = combinePlanAndMachineName(planName, m.name);
 
                 if (count > 1) {
-                    parts.push(`(${count}) Planes ${namePart}, ${copiesFormatted} impresiones o copias c/u (no acumulables) excedente $${excessFormatted}`);
+                    parts.push(`(${count}) Planes ${namePart}, ${copiesFormatted} impresiones o copias c/u (no acumulables) exc. $${excessFormatted}`);
                 } else {
-                    parts.push(`Plan ${namePart}, ${copiesFormatted} impresiones o copias (no acumulables) excedente $${excessFormatted}`);
+                    parts.push(`Plan ${namePart}, ${copiesFormatted} impresiones o copias (no acumulables) exc. $${excessFormatted}`);
                 }
             }
         }
