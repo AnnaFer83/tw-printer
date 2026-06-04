@@ -268,6 +268,19 @@ async function initApp() {
             }
 
             const clientObj = AppState.clients.find(c => c.id === r.clientId);
+
+            // Regenerar observaciones si tienen el formato viejo, vacío o de carga automática
+            if (clientObj) {
+                const currentObs = r.observations || "";
+                if (currentObs === "" || currentObs.includes("sin copias incl.") || currentObs.includes(" | ") || currentObs.startsWith("Carga automática")) {
+                    const newObs = window.generateDefaultObservations ? window.generateDefaultObservations(clientObj) : "";
+                    if (newObs && newObs !== currentObs) {
+                        r.observations = newObs;
+                        dataModified = true;
+                        console.log(`Observaciones actualizadas a formato agrupado para ${r.clientName} (${r.periodMonth} ${r.periodYear})`);
+                    }
+                }
+            }
             let totalAbono = 0;
             let totalExcessCost = 0;
             let totalGeneral = 0;
@@ -2342,7 +2355,7 @@ function processImportedRawRecords(records, sourceName) {
             clientName: clientObj.name,
             periodMonth: month,
             periodYear: year,
-            observations: customObs || `Carga automática de lecturas por ${sourceName}.`,
+            observations: customObs || (window.generateDefaultObservations ? window.generateDefaultObservations(clientObj) : ""),
             machineReadings: machineReadings,
             totalAbono: totalAbono,
             totalExcessCost: totalExcessCost,
@@ -2375,19 +2388,101 @@ window.generateDefaultObservations = function(clientObj) {
     if (!clientObj || !clientObj.machines || clientObj.machines.length === 0) {
         return "";
     }
-    const parts = clientObj.machines.map(m => {
+
+    // Función auxiliar para combinar el nombre del plan y de la máquina sin duplicaciones
+    function combinePlanAndMachineName(planName, machineName) {
+        let cleanPlan = (planName || "").replace(/^plan(es)?\s+/i, '').trim();
+        let cleanMachine = (machineName || "").trim();
+
+        if (!cleanPlan) return cleanMachine;
+
+        const lowerPlan = cleanPlan.toLowerCase();
+        const lowerMachine = cleanMachine.toLowerCase();
+
+        if (lowerPlan.includes(lowerMachine)) {
+            return cleanPlan;
+        }
+        if (lowerMachine.includes(lowerPlan)) {
+            return cleanMachine;
+        }
+
+        const planWords = cleanPlan.split(/\s+/);
+        const machineWords = cleanMachine.split(/\s+/);
+        if (planWords[planWords.length - 1].toLowerCase() === machineWords[0].toLowerCase()) {
+            return planWords.join(" ") + " " + machineWords.slice(1).join(" ");
+        }
+
+        return `${cleanPlan} ${cleanMachine}`;
+    }
+
+    // Agrupar máquinas por configuración
+    const groups = {};
+    clientObj.machines.forEach(m => {
+        let planCopies = 0;
+        let planCost = 0;
+        let excessPrice = 0;
+        let planName = "";
+
         if (m.isFixed) {
-            return `${m.name}: Fijo`;
+            planCost = m.customCost || 0;
         } else {
-            const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0 };
-            const copiesFormatted = PDFGenerator.formatNumber(plan.copies);
-            const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
-            const excessFormatted = PDFGenerator.formatNumber(excessPrice);
-            if (plan.copies === 0) {
-                return `${m.name}: sin copias incl., exd. $${excessFormatted}`;
+            const plan = AppState.plans.find(p => p.id === m.planId) || { name: "", copies: 0, cost: 0, excessPrice: 0 };
+            planCopies = plan.copies;
+            planCost = m.customCost !== null ? m.customCost : plan.cost;
+            excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+            planName = plan.name;
+        }
+
+        // Clave única de agrupación
+        const key = `${m.name.trim()}||${m.isFixed}||${planCopies}||${planCost}||${excessPrice}||${planName}`;
+        if (!groups[key]) {
+            groups[key] = {
+                machine: m,
+                count: 0,
+                planCopies,
+                planCost,
+                excessPrice,
+                planName
+            };
+        }
+        groups[key].count++;
+    });
+
+    const parts = [];
+    Object.values(groups).forEach(g => {
+        const m = g.machine;
+        const count = g.count;
+        const copies = g.planCopies;
+        const excessPrice = g.excessPrice;
+        const planName = g.planName;
+
+        if (m.isFixed) {
+            const costFormatted = PDFGenerator.formatNumber(g.planCost);
+            if (count > 1) {
+                parts.push(`(${count}) ${m.name} abono fijo $${costFormatted} c/u`);
+            } else {
+                parts.push(`${m.name} abono fijo $${costFormatted}`);
             }
-            return `${m.name}: incluye ${copiesFormatted} copias, exd. $${excessFormatted}`;
+        } else {
+            const excessFormatted = PDFGenerator.formatNumber(excessPrice);
+            if (copies === 0) {
+                if (count > 1) {
+                    parts.push(`(${count}) ${m.name}: excedente por impresión $${excessFormatted}`);
+                } else {
+                    parts.push(`${m.name}: excedente por impresión $${excessFormatted}`);
+                }
+            } else {
+                const copiesFormatted = PDFGenerator.formatNumber(copies);
+                const namePart = combinePlanAndMachineName(planName, m.name);
+
+                if (count > 1) {
+                    parts.push(`(${count}) Planes ${namePart}, ${copiesFormatted} impresiones o copias c/u (no acumulables) excedente $${excessFormatted}`);
+                } else {
+                    parts.push(`Plan ${namePart}, ${copiesFormatted} impresiones o copias (no acumulables) excedente $${excessFormatted}`);
+                }
+            }
         }
     });
-    return parts.join(" | ");
+
+    return parts.join(" - ") + ".";
 };
