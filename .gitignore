@@ -6,8 +6,12 @@ Thumbs.db
 *.pdf
 Propuesta_Tecnica_Backend.pdf
 
-# Bases de datos de pruebas locales (se inicializan en el server)
+# Bases de datos — datos reales del negocio, nunca van al repo
 database.json
+database.db
+database.db-wal
+database.db-shm
+backups/
 
 # Archivos temporales o de cache
 .goutputstream-*

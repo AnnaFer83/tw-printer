@@ -72,25 +72,31 @@ Total Cliente = Σ Total de cada Máquina
 | Capa | Tecnología | Notas |
 |---|---|---|
 | Frontend | HTML + JS vanilla + CSS | SPA sin frameworks, sin build step |
-| Backend | Python 3 stdlib (`http.server`, `json`, `sqlite3`) | Sin dependencias externas. Un solo archivo. |
-| Base de datos | SQLite (`database.db`) | WAL mode, transacciones atómicas. Fallback a `localStorage` si el servidor no responde. |
+| Backend (prod) | Ninguno | Eliminado. El frontend llama directo a Supabase. |
+| Backend (local) | Python 3 stdlib (`http.server`, `sqlite3`) | Solo para desarrollo local. `python server.py` |
+| Base de datos (prod) | Supabase (PostgreSQL) | Gratis, siempre activo, sin tarjeta. |
+| Base de datos (local) | SQLite (`database.db`) | Para desarrollo sin internet. |
+| Hosting frontend | GitHub Pages | Sirve los archivos estáticos del repo. |
 | PDF | html2pdf.js (navegador) | Generación del lado del cliente, sin servidor |
 | Importación | SheetJS, PapaParse, PDF.js, Tesseract.js | Excel, CSV, PDF, OCR de imágenes, texto libre |
 
 ### Estructura de archivos
 ```
 tw-printer/
-├── index.html              # UI completa (SPA)
-├── server.py               # Servidor + API REST (usa SQLite)
-├── migrate.py              # Migración one-time: database.json → database.db
-├── database.db             # Base de datos SQLite [NO debe ir al repo]
-├── database.json           # Archivo legacy — conservar como backup, no usar en producción
-├── deploy_oracle.md        # Runbook de deploy en Oracle Cloud
+├── index.html                  # UI completa (SPA)
+├── server.py                   # Servidor local para desarrollo (SQLite)
+├── supabase_schema.sql         # SQL para crear tablas en Supabase (ejecutar 1 vez)
+├── migrate_to_supabase.py      # Migración one-time: database.json → Supabase
+├── migrate.py                  # Migración alternativa: database.json → SQLite local
+├── database.db                 # Base de datos SQLite local [NO debe ir al repo]
+├── database.json               # Archivo legacy — backup histórico [NO debe ir al repo]
+├── deploy_oracle.md            # Runbook alternativo: Oracle Cloud (no usado)
 ├── css/styles.css
 ├── js/
-│   ├── app.js              # Estado global, eventos, renderizado
-│   ├── parser.js           # Motor de importación de datos
-│   └── pdfGenerator.js     # Generación de PDFs
+│   ├── supabase-adapter.js     # Adapter Supabase (loadData/saveData)
+│   ├── app.js                  # Estado global, eventos, renderizado
+│   ├── parser.js               # Motor de importación de datos
+│   └── pdfGenerator.js         # Generación de PDFs
 └── img/logo.png
 ```
 
@@ -189,8 +195,9 @@ tw-printer/
 | 2026-06-03 | Análisis | Lectura y análisis completo del proyecto. Creación de `ANALISIS_REGLAS_NEGOCIO.md`. |
 | 2026-06-03 | Contexto | Creación de `developer_context.md` como documento vivo del proyecto. |
 | 2026-06-03 | Contexto | Ajuste del rol: equipo actúa como coordinador y DevOps. El cliente es el desarrollador principal. |
-| 2026-06-03 | Arquitectura | Migración de persistencia: `database.json` → SQLite (`database.db`). API sin cambios. WAL mode + transacciones atómicas. Creados `server.py` (reescrito), `migrate.py` (one-time), `deploy_oracle.md` (runbook). |
-| 2026-06-03 | DevOps | Decisión de hosting: Oracle Cloud Always Free (ARM VM.Standard.A1.Flex). Runbook documentado en `deploy_oracle.md`. Incluye Nginx + systemd + SSL + auth básica + backups automáticos. |
+| 2026-06-03 | Arquitectura | Migración de persistencia: `database.json` → SQLite (`database.db`). Creados `server.py` (reescrito), `migrate.py`, `deploy_oracle.md`. |
+| 2026-06-04 | Arquitectura | Cambio de estrategia: se abandona Oracle Cloud (problemas de registro). Nueva arquitectura: Supabase (PostgreSQL) + GitHub Pages. Eliminado `server.py` de producción. Creados `supabase_schema.sql`, `js/supabase-adapter.js`, `migrate_to_supabase.py`. Cambios mínimos en `app.js` e `index.html`. |
+| 2026-06-04 | Bugfix | Corregidos bugs en `server.py`: campo `name` (no `machineName`) en machine_readings, `serialNumber` faltante, `excessPrice` en planes, `uploadDate`/`user` en lecturas. |
 | 2026-06-04 | Feature | Cliente (Natalia) subió 9 commits (v1.6). Cambios principales: (1) Soporte para **planes con copias = 0** (pago por copia puro) — toca la fórmula central, incluye fix de cálculos, display PDF y migración automática de históricos. (2) **Excedente específico por plan** (nueva jerarquía: `plan.excessPrice`). (3) **Dashboard con historial de 12 meses** agrupado por cliente con doble acordeón y registro de operador/fecha. (4) Simplificación de formato de observaciones y agrupación de máquinas idénticas. (5) Pie de reporte cambiado a datos de contacto fijos de TecnoWork. |
 
 ---

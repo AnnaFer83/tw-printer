@@ -101,18 +101,9 @@ async function syncWithServer() {
     };
     
     try {
-        const response = await fetch('/api/save', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) {
-            console.warn("El servidor no pudo procesar el guardado de datos.");
-        }
+        await SupabaseAdapter.saveData(payload);
     } catch (e) {
-        console.warn("No se pudo conectar con el servidor para guardar los datos. Se usará el almacenamiento local.", e);
+        console.warn("No se pudo guardar en Supabase. Los datos quedan en almacenamiento local.", e);
     }
 }
 
@@ -129,24 +120,21 @@ async function initApp() {
     let dataLoadedFromServer = false;
     
     try {
-        const response = await fetch('/api/data');
-        if (response.ok) {
-            const data = await response.json();
-            if (data && data.clients && data.plans && data.readings && data.config) {
-                if (data.clients.length > 0 || data.plans.length > 0) {
-                    AppState.clients = data.clients;
-                    AppState.plans = data.plans;
-                    AppState.readings = data.readings;
-                    AppState.config = data.config;
-                    dataLoadedFromServer = true;
-                    console.log("Datos cargados exitosamente desde la base de datos del servidor.");
-                } else {
-                    console.log("Base de datos del servidor vacía. Se migrarán los datos locales al servidor.");
-                }
+        const data = await SupabaseAdapter.loadData();
+        if (data && data.clients && data.plans && data.readings && data.config) {
+            if (data.clients.length > 0 || data.plans.length > 0) {
+                AppState.clients = data.clients;
+                AppState.plans = data.plans;
+                AppState.readings = data.readings;
+                AppState.config = data.config;
+                dataLoadedFromServer = true;
+                console.log("Datos cargados exitosamente desde Supabase.");
+            } else {
+                console.log("Base de datos Supabase vacía. Se migrarán los datos locales.");
             }
         }
     } catch (e) {
-        console.log("Servidor de base de datos no disponible. Cargando desde el almacenamiento local del navegador.", e);
+        console.log("Supabase no disponible. Cargando desde el almacenamiento local del navegador.", e);
     }
 
     if (!dataLoadedFromServer) {
