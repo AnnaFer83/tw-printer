@@ -546,8 +546,8 @@ function setupEventListeners() {
                 if (planCopies === 0) {
                     excess = isPending ? 0 : consumption;
                     excessCost = isPending ? 0 : consumption * excessPrice;
-                    finalPlanCost = 0;
-                    totalCost = excessCost;
+                    finalPlanCost = planCost;
+                    totalCost = isPending ? planCost : planCost + excessCost;
                 } else {
                     excess = isPending ? 0 : Math.max(0, consumption - planCopies);
                     excessCost = isPending ? 0 : excess * excessPrice;
@@ -1128,7 +1128,7 @@ window.recalcMultiSheetPreview = function() {
             if (prevVal === "" || currVal === "") {
                 hasPending = true;
                 document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
-                grandTotal += planCopies === 0 ? 0 : planCost;
+                grandTotal += planCost;
             } else {
                 const prev = parseInt(prevVal) || 0;
                 const curr = parseInt(currVal) || 0;
@@ -1137,7 +1137,7 @@ window.recalcMultiSheetPreview = function() {
                 const consumption = Math.max(0, curr - prev);
                 let total = 0;
                 if (planCopies === 0) {
-                    total = consumption * excessPrice;
+                    total = planCost + (consumption * excessPrice);
                 } else {
                     const excess = Math.max(0, consumption - planCopies);
                     const excessCost = excess * excessPrice;
@@ -1187,8 +1187,7 @@ function recalculateAllReadings() {
                 if (mr.planCopies === 0) {
                     mr.excess = mr.consumption;
                     mr.excessCost = mr.consumption * mr.excessPrice;
-                    mr.planCost = 0;
-                    mr.totalCost = mr.excessCost;
+                    mr.totalCost = mr.planCost + mr.excessCost;
                 } else {
                     mr.excess = Math.max(0, mr.consumption - mr.planCopies);
                     mr.excessCost = mr.excess * mr.excessPrice;
@@ -1951,7 +1950,7 @@ window.shareWhatsApp = function(readingId) {
             text += `   - Abono Fijo: ${PDFGenerator.formatCurrency(mr.planCost)}\n`;
         } else {
             text += `   - Lecturas: ${PDFGenerator.formatNumber(mr.prevCounter)} a ${PDFGenerator.formatNumber(mr.currCounter)}\n`;
-            text += `   - Consumo: ${PDFGenerator.formatNumber(mr.consumption)} copias (Plan: ${PDFGenerator.formatNumber(mr.planCopies)})\n`;
+            text += `   - Consumo: ${PDFGenerator.formatNumber(mr.consumption)} copias (Plan: ${PDFGenerator.formatNumber(mr.planCopies === 0 ? mr.excessPrice : mr.planCopies)})\n`;
             if (mr.excess > 0) {
                 text += `   - Excedente: *${PDFGenerator.formatNumber(mr.excess)}* copias × $${PDFGenerator.formatNumber(mr.excessPrice)} = *${PDFGenerator.formatCurrency(mr.excessCost)}*\n`;
             }
@@ -2275,8 +2274,8 @@ function processImportedRawRecords(records, sourceName) {
                 if (planCopies === 0) {
                     excess = isPending ? 0 : consumption;
                     excessCost = isPending ? 0 : consumption * excessPrice;
-                    finalPlanCost = 0;
-                    totalCost = excessCost;
+                    finalPlanCost = planCost;
+                    totalCost = isPending ? planCost : planCost + excessCost;
                 } else {
                     excess = isPending ? 0 : Math.max(0, consumption - planCopies);
                     excessCost = isPending ? 0 : excess * excessPrice;

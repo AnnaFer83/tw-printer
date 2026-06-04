@@ -84,7 +84,7 @@ const PDFGenerator = {
                     <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
                     <td style="text-align: right; padding: 8px 10px; color: #dc2626 !important; font-weight: 600;" class="pdf-cell-yellow">Pendiente</td>
                     <td style="text-align: right; padding: 8px 10px; color: #dc2626 !important; font-weight: 600;" class="pdf-cell-yellow">Pendiente</td>
-                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies)}</td>
+                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies === 0 ? mr.excessPrice : mr.planCopies)}</td>
                     <td style="text-align: right; padding: 8px 10px; color: #dc2626 !important;">Pendiente</td>
                     <td style="text-align: right; padding: 8px 10px; color: #dc2626 !important;">Pendiente</td>
                     <td style="text-align: right; font-weight: 700; padding: 8px 10px; color: #dc2626 !important;">Pendiente</td>
@@ -96,7 +96,7 @@ const PDFGenerator = {
                     <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
                     <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevCounter)}</td>
                     <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currCounter)}</td>
-                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies)}</td>
+                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies === 0 ? mr.excessPrice : mr.planCopies)}</td>
                     <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${mr.excess > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(mr.excess)}</td>
                     <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.excessCost)}</td>
                     <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.totalCost)}</td>
