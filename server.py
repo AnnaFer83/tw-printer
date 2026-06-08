@@ -117,6 +117,7 @@ def init_db():
 
     # Ejecutar alteraciones para bases de datos SQLite locales que ya existían
     cols_to_add = [
+        ("serial_number", "TEXT DEFAULT ''"),
         ("prev_impresiones", "REAL DEFAULT 0"),
         ("curr_impresiones", "REAL DEFAULT 0"),
         ("prev_copias", "REAL DEFAULT 0"),
