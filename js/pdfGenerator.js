@@ -62,11 +62,21 @@ const PDFGenerator = {
         const tbody = clone.querySelector('#pdf-table-items-body');
         tbody.innerHTML = "";
 
+        let totalCopPrev = 0, totalCopCurr = 0, totalCopCons = 0;
+        let totalImpPrev = 0, totalImpCurr = 0, totalImpCons = 0;
+        let totalPPPrev = 0, totalPPCurr = 0, totalPPCons = 0;
+        let totalPFPrev = 0, totalPFCurr = 0, totalPFCons = 0;
+        let hasSub = false;
+        let firstLaserExcessPrice = AppState.config.defaultExcessPrice || 90;
+        let foundLaserPrice = false;
+
         record.machineReadings.forEach(mr => {
-            const tr = document.createElement("tr");
+            const type = window.getMachineType(mr.name);
+            const hasRep = mr.hasReplacement || false;
 
             if (mr.isFixed) {
                 // Concepto fijo
+                const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
                     <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
@@ -77,8 +87,10 @@ const PDFGenerator = {
                     <td style="text-align: right; padding: 8px 10px;">0</td>
                     <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.totalCost)}</td>
                 `;
+                tbody.appendChild(tr);
             } else if (mr.isPending) {
                 // Pendiente de lectura
+                const tr = document.createElement("tr");
                 tr.innerHTML = `
                     <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
                     <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
@@ -89,21 +101,271 @@ const PDFGenerator = {
                     <td style="text-align: right; padding: 8px 10px; color: #dc2626 !important;">Pendiente</td>
                     <td style="text-align: right; font-weight: 700; padding: 8px 10px; color: #dc2626 !important;">Pendiente</td>
                 `;
+                tbody.appendChild(tr);
             } else {
-                // Fila con contadores
-                tr.innerHTML = `
-                    <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
-                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
-                    <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevCounter)}</td>
-                    <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currCounter)}</td>
-                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies === 0 ? mr.excessPrice : mr.planCopies)}</td>
-                    <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${mr.excess > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(mr.excess)}</td>
-                    <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.excessCost)}</td>
-                    <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.totalCost)}</td>
+                if (type === "color") {
+                    hasSub = true;
+                    const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                    const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+                    const consPP_ant = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
+                    const consPF_ant = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
+                    const excessCost_ant = (consPP_ant * ppPrice) + (consPF_ant * pfPrice);
+
+                    totalPPPrev += mr.prevPP || 0;
+                    totalPPCurr += mr.currPP || 0;
+                    totalPPCons += consPP_ant;
+
+                    totalPFPrev += mr.prevPF || 0;
+                    totalPFCurr += mr.currPF || 0;
+                    totalPFCons += consPF_ant;
+
+                    if (hasRep) {
+                        const repPrevPP = mr.repPrevPP || 0;
+                        const repCurrPP = mr.repCurrPP || 0;
+                        const repPrevPF = mr.repPrevPF || 0;
+                        const repCurrPF = mr.repCurrPF || 0;
+
+                        const consPP_nvo = Math.max(0, repCurrPP - repPrevPP);
+                        const consPF_nvo = Math.max(0, repCurrPF - repPrevPF);
+                        const excessCost_nvo = (consPP_nvo * ppPrice) + (consPF_nvo * pfPrice);
+
+                        totalPPPrev += repPrevPP;
+                        totalPPCurr += repCurrPP;
+                        totalPPCons += consPP_nvo;
+
+                        totalPFPrev += repPrevPF;
+                        totalPFCurr += repCurrPF;
+                        totalPFCons += consPF_nvo;
+
+                        // Fila Anterior (Color)
+                        const trAnt = document.createElement("tr");
+                        trAnt.innerHTML = `
+                            <td style="font-weight: 700; padding: 8px 10px;">[Ant] ${mr.name}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.currPP} | PF:${mr.currPF}</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCost_ant > 0 ? '#d97706' : '#1e293b'}; font-size: 8px;">PP:${consPP_ant} | PF:${consPF_ant}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCost_ant)}</td>
+                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.planCost + excessCost_ant)}</td>
+                        `;
+                        tbody.appendChild(trAnt);
+
+                        // Fila Nuevo (Color)
+                        const trNvo = document.createElement("tr");
+                        trNvo.style.backgroundColor = "rgba(0,0,0,0.01)";
+                        trNvo.innerHTML = `
+                            <td style="font-weight: 700; padding: 8px 10px; padding-left: 15px;">[Nvo] ${mr.repModel}</td>
+                            <td style="text-align: right; padding: 8px 10px;">0</td>
+                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${repPrevPP} | PF:${repPrevPF}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${repCurrPP} | PF:${repCurrPF}</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCost_nvo > 0 ? '#d97706' : '#1e293b'}; font-size: 8px;">PP:${consPP_nvo} | PF:${consPF_nvo}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCost_nvo)}</td>
+                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(excessCost_nvo)}</td>
+                        `;
+                        tbody.appendChild(trNvo);
+                    } else {
+                        // Fila Única (Color)
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.currPP} | PF:${mr.currPF}</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${mr.excessCost > 0 ? '#d97706' : '#1e293b'}; font-size: 8px;">PP:${consPP_ant} | PF:${consPF_ant}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.excessCost)}</td>
+                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.totalCost)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    }
+                } else {
+                    // Laser / BN
+                    if (!foundLaserPrice && mr.excessPrice !== undefined && mr.excessPrice !== null) {
+                        firstLaserExcessPrice = mr.excessPrice;
+                        foundLaserPrice = true;
+                    }
+
+                    const hasSubVals = (mr.prevImpresiones || mr.currImpresiones || mr.prevCopias || mr.currCopias ||
+                                        mr.repPrevImpresiones || mr.repCurrImpresiones || mr.repPrevCopias || mr.repCurrCopias);
+                    if (hasSubVals) {
+                        hasSub = true;
+                        totalImpPrev += mr.prevImpresiones || 0;
+                        totalImpCurr += mr.currImpresiones || 0;
+                        totalImpCons += Math.max(0, (mr.currImpresiones || 0) - (mr.prevImpresiones || 0));
+
+                        totalCopPrev += mr.prevCopias || 0;
+                        totalCopCurr += mr.currCopias || 0;
+                        totalCopCons += Math.max(0, (mr.currCopias || 0) - (mr.prevCopias || 0));
+                    }
+
+                    if (hasRep) {
+                        const repPrev = mr.repPrevCounter || 0;
+                        const repCurr = mr.repCurrCounter || 0;
+                        const repCons = Math.max(0, repCurr - repPrev);
+
+                        if (hasSubVals) {
+                            totalImpPrev += mr.repPrevImpresiones || 0;
+                            totalImpCurr += mr.repCurrImpresiones || 0;
+                            totalImpCons += Math.max(0, (mr.repCurrImpresiones || 0) - (mr.repPrevImpresiones || 0));
+
+                            totalCopPrev += mr.repPrevCopias || 0;
+                            totalCopCurr += mr.repCurrCopias || 0;
+                            totalCopCons += Math.max(0, (mr.repCurrCopias || 0) - (mr.repPrevCopias || 0));
+                        }
+
+                        // Redistribution logic
+                        let excessAnt = 0;
+                        let excessNvo = 0;
+
+                        if (mr.planCopies === 0) {
+                            excessAnt = mr.consumption;
+                            excessNvo = repCons;
+                        } else {
+                            excessAnt = Math.max(0, mr.consumption - mr.planCopies);
+                            const remainingPlan = Math.max(0, mr.planCopies - mr.consumption);
+                            excessNvo = Math.max(0, repCons - remainingPlan);
+                        }
+
+                        const excessCost_ant = excessAnt * mr.excessPrice;
+                        const excessCost_nvo = excessNvo * mr.excessPrice;
+
+                        // Fila Anterior (Laser)
+                        const trAnt = document.createElement("tr");
+                        trAnt.innerHTML = `
+                            <td style="font-weight: 700; padding: 8px 10px;">[Ant] ${mr.name}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevCounter)}</td>
+                            <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currCounter)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies === 0 ? mr.excessPrice : mr.planCopies)}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessAnt > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(excessAnt)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCost_ant)}</td>
+                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.planCost + excessCost_ant)}</td>
+                        `;
+                        tbody.appendChild(trAnt);
+
+                        // Fila Nuevo (Laser)
+                        const trNvo = document.createElement("tr");
+                        trNvo.style.backgroundColor = "rgba(0,0,0,0.01)";
+                        trNvo.innerHTML = `
+                            <td style="font-weight: 700; padding: 8px 10px; padding-left: 15px;">[Nvo] ${mr.repModel}</td>
+                            <td style="text-align: right; padding: 8px 10px;">0</td>
+                            <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(repPrev)}</td>
+                            <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(repCurr)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">-</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessNvo > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(excessNvo)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCost_nvo)}</td>
+                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(excessCost_nvo)}</td>
+                        `;
+                        tbody.appendChild(trNvo);
+                    } else {
+                        // Fila Única (Laser)
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
+                            <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevCounter)}</td>
+                            <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currCounter)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCopies === 0 ? mr.excessPrice : mr.planCopies)}</td>
+                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${mr.excess > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(mr.excess)}</td>
+                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.excessCost)}</td>
+                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.totalCost)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    }
+                }
+            }
+        });
+
+        // Si hay subcontadores activos, append de la tabla consolidada en el clon de PDF
+        if (hasSub) {
+            const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+            const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+            let pdfRowsHtml = "";
+            if (totalCopCons > 0 || totalCopPrev > 0 || totalCopCurr > 0) {
+                pdfRowsHtml += `
+                    <tr style="border-bottom: 1px solid #cbd5e1;">
+                        <td style="padding: 4px 6px; text-align: left; font-weight: 600;">Fotocopias (Copias)</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalCopPrev)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalCopCurr)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #3b4b61;">${this.formatNumber(totalCopCons)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatCurrency(firstLaserExcessPrice)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #16a34a;">${this.formatCurrency(totalCopCons * firstLaserExcessPrice)}</td>
+                    </tr>
                 `;
             }
-            tbody.appendChild(tr);
-        });
+            if (totalImpCons > 0 || totalImpPrev > 0 || totalImpCurr > 0) {
+                pdfRowsHtml += `
+                    <tr style="border-bottom: 1px solid #cbd5e1;">
+                        <td style="padding: 4px 6px; text-align: left; font-weight: 600;">Impresiones (Printouts)</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalImpPrev)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalImpCurr)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #3b4b61;">${this.formatNumber(totalImpCons)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatCurrency(firstLaserExcessPrice)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #16a34a;">${this.formatCurrency(totalImpCons * firstLaserExcessPrice)}</td>
+                    </tr>
+                `;
+            }
+            if (totalPPCons > 0 || totalPPPrev > 0 || totalPPCurr > 0) {
+                pdfRowsHtml += `
+                    <tr style="border-bottom: 1px solid #cbd5e1;">
+                        <td style="padding: 4px 6px; text-align: left; font-weight: 600;">Color (Papel Común PP)</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalPPPrev)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalPPCurr)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #3b4b61;">${this.formatNumber(totalPPCons)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatCurrency(ppPrice)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #16a34a;">${this.formatCurrency(totalPPCons * ppPrice)}</td>
+                    </tr>
+                `;
+            }
+            if (totalPFCons > 0 || totalPFPrev > 0 || totalPFCurr > 0) {
+                pdfRowsHtml += `
+                    <tr style="border-bottom: 1px solid #cbd5e1;">
+                        <td style="padding: 4px 6px; text-align: left; font-weight: 600;">Fotografía (Papel Fotográfico PF)</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalPFPrev)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatNumber(totalPFCurr)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #3b4b61;">${this.formatNumber(totalPFCons)}</td>
+                        <td style="padding: 4px 6px; text-align: right;">${this.formatCurrency(pfPrice)}</td>
+                        <td style="padding: 4px 6px; text-align: right; font-weight: 700; color: #16a34a;">${this.formatCurrency(totalPFCons * pfPrice)}</td>
+                    </tr>
+                `;
+            }
+
+            if (pdfRowsHtml) {
+                const tableSection = clone.querySelector('.invoice-table-section');
+                if (tableSection) {
+                    const div = document.createElement('div');
+                    div.className = 'pdf-breakdown-section';
+                    div.style.marginTop = '12px';
+                    div.style.marginBottom = '8px';
+                    div.style.width = '100%';
+                    div.innerHTML = `
+                        <h4 style="font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: #3b4b61; margin: 0 0 6px 0; text-transform: uppercase; text-align: left; border-bottom: 1px solid #cbd5e1; padding-bottom: 3px;">
+                            Desglose Consolidado de Consumos
+                        </h4>
+                        <table class="pdf-table" style="border: 1px solid #94a3b8; width: 100%; font-size: 8px; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: #3b4b61; color: white !important;">
+                                    <th style="padding: 4px 6px; text-align: left; font-weight: 700; border-right: 1px solid #cbd5e1; color: white !important;">CONCEPTO</th>
+                                    <th style="padding: 4px 6px; text-align: right; font-weight: 700; border-right: 1px solid #cbd5e1; color: white !important;">ANTERIOR</th>
+                                    <th style="padding: 4px 6px; text-align: right; font-weight: 700; border-right: 1px solid #cbd5e1; color: white !important;">ACTUAL</th>
+                                    <th style="padding: 4px 6px; text-align: right; font-weight: 700; border-right: 1px solid #cbd5e1; color: white !important;">CONSUMO</th>
+                                    <th style="padding: 4px 6px; text-align: right; font-weight: 700; border-right: 1px solid #cbd5e1; color: white !important;">PRECIO UNIT.</th>
+                                    <th style="padding: 4px 6px; text-align: right; font-weight: 700; color: white !important;">VALOR VENTA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pdfRowsHtml}
+                            </tbody>
+                        </table>
+                    `;
+                    tableSection.parentNode.insertBefore(div, tableSection.nextSibling);
+                }
+            }
+        }
 
         // Total general en la caja verde (con indicador si hay pendientes)
         const hasPending = record.machineReadings.some(mr => mr.isPending);

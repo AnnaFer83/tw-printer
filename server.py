@@ -89,19 +89,79 @@ def init_db():
             total_cost    REAL DEFAULT 0,
             custom_cost   REAL DEFAULT 0,
             is_pending    INTEGER DEFAULT 0,
+            prev_impresiones REAL DEFAULT 0,
+            curr_impresiones REAL DEFAULT 0,
+            prev_copias      REAL DEFAULT 0,
+            curr_copias      REAL DEFAULT 0,
+            prev_pp          REAL DEFAULT 0,
+            curr_pp          REAL DEFAULT 0,
+            prev_pf          REAL DEFAULT 0,
+            curr_pf          REAL DEFAULT 0,
+            has_replacement  INTEGER DEFAULT 0,
+            rep_model        TEXT DEFAULT '',
+            rep_serial_number TEXT DEFAULT '',
+            rep_prev_counter REAL DEFAULT 0,
+            rep_curr_counter REAL DEFAULT 0,
+            rep_consumption  REAL DEFAULT 0,
+            rep_prev_impresiones REAL DEFAULT 0,
+            rep_curr_impresiones REAL DEFAULT 0,
+            rep_prev_copias      REAL DEFAULT 0,
+            rep_curr_copias      REAL DEFAULT 0,
+            rep_prev_pp          REAL DEFAULT 0,
+            rep_curr_pp          REAL DEFAULT 0,
+            rep_prev_pf          REAL DEFAULT 0,
+            rep_curr_pf          REAL DEFAULT 0,
             FOREIGN KEY (reading_id) REFERENCES readings(id)
         );
     """)
+
+    # Ejecutar alteraciones para bases de datos SQLite locales que ya existían
+    cols_to_add = [
+        ("prev_impresiones", "REAL DEFAULT 0"),
+        ("curr_impresiones", "REAL DEFAULT 0"),
+        ("prev_copias", "REAL DEFAULT 0"),
+        ("curr_copias", "REAL DEFAULT 0"),
+        ("prev_pp", "REAL DEFAULT 0"),
+        ("curr_pp", "REAL DEFAULT 0"),
+        ("prev_pf", "REAL DEFAULT 0"),
+        ("curr_pf", "REAL DEFAULT 0"),
+        ("has_replacement", "INTEGER DEFAULT 0"),
+        ("rep_model", "TEXT DEFAULT ''"),
+        ("rep_serial_number", "TEXT DEFAULT ''"),
+        ("rep_prev_counter", "REAL DEFAULT 0"),
+        ("rep_curr_counter", "REAL DEFAULT 0"),
+        ("rep_consumption", "REAL DEFAULT 0"),
+        ("rep_prev_impresiones", "REAL DEFAULT 0"),
+        ("rep_curr_impresiones", "REAL DEFAULT 0"),
+        ("rep_prev_copias", "REAL DEFAULT 0"),
+        ("rep_curr_copias", "REAL DEFAULT 0"),
+        ("rep_prev_pp", "REAL DEFAULT 0"),
+        ("rep_curr_pp", "REAL DEFAULT 0"),
+        ("rep_prev_pf", "REAL DEFAULT 0"),
+        ("rep_curr_pf", "REAL DEFAULT 0"),
+    ]
+    for col_name, col_type in cols_to_add:
+        try:
+            conn.execute(f"ALTER TABLE machine_readings ADD COLUMN {col_name} {col_type}")
+        except sqlite3.OperationalError:
+            pass  # Ya existe la columna
 
     if not conn.execute("SELECT 1 FROM config LIMIT 1").fetchone():
         conn.executemany(
             "INSERT INTO config (key, value) VALUES (?, ?)",
             [
                 ("defaultExcessPrice", "90"),
+                ("defaultPPPrice", "300"),
+                ("defaultPFPrice", "600"),
                 ("companyName",        '"LEXORER S.R.L."'),
                 ("companySub",         '"TW - Informes de Consumo de Impresión"'),
             ]
         )
+    else:
+        # Asegurar que defaultPPPrice y defaultPFPrice existan en la tabla config
+        for k, v in [("defaultPPPrice", "300"), ("defaultPFPrice", "600")]:
+            if not conn.execute("SELECT 1 FROM config WHERE key = ?", (k,)).fetchone():
+                conn.execute("INSERT INTO config (key, value) VALUES (?, ?)", (k, v))
 
     conn.commit()
     conn.close()
@@ -189,6 +249,32 @@ def load_data():
                 "totalCost":   mr["total_cost"],
                 "customCost":  mr["custom_cost"],
                 "isPending":   bool(mr["is_pending"]),
+                
+                # Nuevos campos
+                "prevImpresiones": mr["prev_impresiones"] if mr["prev_impresiones"] is not None else 0,
+                "currImpresiones": mr["curr_impresiones"] if mr["curr_impresiones"] is not None else 0,
+                "prevCopias":      mr["prev_copias"] if mr["prev_copias"] is not None else 0,
+                "currCopias":      mr["curr_copias"] if mr["curr_copias"] is not None else 0,
+                "prevPP":          mr["prev_pp"] if mr["prev_pp"] is not None else 0,
+                "currPP":          mr["curr_pp"] if mr["curr_pp"] is not None else 0,
+                "prevPF":          mr["prev_pf"] if mr["prev_pf"] is not None else 0,
+                "currPF":          mr["curr_pf"] if mr["curr_pf"] is not None else 0,
+                
+                # Campos de reemplazo
+                "hasReplacement":  bool(mr["has_replacement"]),
+                "repModel":        mr["rep_model"] or "",
+                "repSerialNumber": mr["rep_serial_number"] or "",
+                "repPrevCounter":  mr["rep_prev_counter"] if mr["rep_prev_counter"] is not None else 0,
+                "repCurrCounter":  mr["rep_curr_counter"] if mr["rep_curr_counter"] is not None else 0,
+                "repConsumption":  mr["rep_consumption"] if mr["rep_consumption"] is not None else 0,
+                "repPrevImpresiones": mr["rep_prev_impresiones"] if mr["rep_prev_impresiones"] is not None else 0,
+                "repCurrImpresiones": mr["rep_curr_impresiones"] if mr["rep_curr_impresiones"] is not None else 0,
+                "repPrevCopias":      mr["rep_prev_copias"] if mr["rep_prev_copias"] is not None else 0,
+                "repCurrCopias":      mr["rep_curr_copias"] if mr["rep_curr_copias"] is not None else 0,
+                "repPrevPP":          mr["rep_prev_pp"] if mr["rep_prev_pp"] is not None else 0,
+                "repCurrPP":          mr["rep_curr_pp"] if mr["rep_curr_pp"] is not None else 0,
+                "repPrevPF":          mr["rep_prev_pf"] if mr["rep_prev_pf"] is not None else 0,
+                "repCurrPF":          mr["rep_curr_pf"] if mr["rep_curr_pf"] is not None else 0,
             })
         readings.append(reading)
 
@@ -266,8 +352,13 @@ def save_data(payload):
                     """INSERT INTO machine_readings
                        (reading_id, machine_id, machine_name, serial_number, is_fixed,
                         prev_counter, curr_counter, consumption, plan_copies, excess,
-                        excess_price, plan_cost, excess_cost, total_cost, custom_cost, is_pending)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        excess_price, plan_cost, excess_cost, total_cost, custom_cost, is_pending,
+                        prev_impresiones, curr_impresiones, prev_copias, curr_copias,
+                        prev_pp, curr_pp, prev_pf, curr_pf,
+                        has_replacement, rep_model, rep_serial_number, rep_prev_counter, rep_curr_counter,
+                        rep_consumption, rep_prev_impresiones, rep_curr_impresiones, rep_prev_copias,
+                        rep_curr_copias, rep_prev_pp, rep_curr_pp, rep_prev_pf, rep_curr_pf)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         r["id"],
                         mr.get("machineId", ""),
@@ -285,6 +376,28 @@ def save_data(payload):
                         mr.get("totalCost", 0),
                         mr.get("customCost", 0),
                         1 if mr.get("isPending") else 0,
+                        mr.get("prevImpresiones", 0),
+                        mr.get("currImpresiones", 0),
+                        mr.get("prevCopias", 0),
+                        mr.get("currCopias", 0),
+                        mr.get("prevPP", 0),
+                        mr.get("currPP", 0),
+                        mr.get("prevPF", 0),
+                        mr.get("currPF", 0),
+                        1 if mr.get("hasReplacement") else 0,
+                        mr.get("repModel", ""),
+                        mr.get("repSerialNumber", ""),
+                        mr.get("repPrevCounter", 0),
+                        mr.get("repCurrCounter", 0),
+                        mr.get("repConsumption", 0),
+                        mr.get("repPrevImpresiones", 0),
+                        mr.get("repCurrImpresiones", 0),
+                        mr.get("repPrevCopias", 0),
+                        mr.get("repCurrCopias", 0),
+                        mr.get("repPrevPP", 0),
+                        mr.get("repCurrPP", 0),
+                        mr.get("repPrevPF", 0),
+                        mr.get("repCurrPF", 0),
                     )
                 )
 

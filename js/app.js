@@ -9,6 +9,8 @@ const AppState = {
     readings: [],
     config: {
         defaultExcessPrice: 90,
+        defaultPPPrice: 300,
+        defaultPFPrice: 600,
         companyName: "LEXORER S.R.L.",
         companySub: "TW - Informes de Consumo de Impresión"
     },
@@ -18,6 +20,14 @@ const AppState = {
     tempClientMachines: [], // Almacén temporal de máquinas al registrar/editar cliente
     editingTempMachineIndex: null, // Control de edición en línea de número de serie de equipo temporal
     billingChart: null
+};
+
+window.getMachineType = function(machineName) {
+    const name = (machineName || "").toLowerCase();
+    if (name.includes("canon") || name.includes("color") || name.includes("g3100") || name.includes("g2100") || name.includes("g1100") || name.includes("g1000")) {
+        return "color";
+    }
+    return "laser";
 };
 
 // Datos por Defecto para Inicializar la Aplicación por primera vez (Caso Real ACLISA)
@@ -203,6 +213,8 @@ async function initApp() {
 
     // Rellenar formulario general de configuración
     document.getElementById("config-default-excess-price").value = AppState.config.defaultExcessPrice;
+    document.getElementById("config-default-pp-price").value = AppState.config.defaultPPPrice || 300;
+    document.getElementById("config-default-pf-price").value = AppState.config.defaultPFPrice || 600;
     document.getElementById("config-company-name").value = AppState.config.companyName;
     document.getElementById("config-company-sub").value = AppState.config.companySub;
     const userConfigEl = document.getElementById("config-current-user");
@@ -525,6 +537,8 @@ function setupEventListeners() {
 
         // Recorrer filas de la planilla
         clientObj.machines.forEach(m => {
+            if (validationError) return;
+
             if (m.isFixed) {
                 // Concepto fijo
                 const readingCost = m.customCost || 0;
@@ -541,52 +555,241 @@ function setupEventListeners() {
                     planCost: readingCost,
                     excessCost: 0,
                     totalCost: readingCost,
-                    isFixed: true
+                    isFixed: true,
+                    isPending: false,
+
+                    // Sub-contadores y reemplazo inicializados a cero/vacíos
+                    prevImpresiones: 0, currImpresiones: 0,
+                    prevCopias: 0, currCopias: 0,
+                    prevPP: 0, currPP: 0,
+                    prevPF: 0, currPF: 0,
+                    hasReplacement: false,
+                    repModel: "", repSerialNumber: "",
+                    repPrevCounter: 0, repCurrCounter: 0, repConsumption: 0,
+                    repPrevImpresiones: 0, repCurrImpresiones: 0,
+                    repPrevCopias: 0, repCurrCopias: 0,
+                    repPrevPP: 0, repCurrPP: 0,
+                    repPrevPF: 0, repCurrPF: 0
                 });
                 totalAbono += readingCost;
                 totalGeneral += readingCost;
             } else {
-                // Contador
-                const prevInput = document.getElementById(`prev-${m.id}`);
-                const currInput = document.getElementById(`curr-${m.id}`);
-                
-                const prevVal = prevInput ? prevInput.value.trim() : "";
-                const currVal = currInput ? currInput.value.trim() : "";
-
-                const isPending = prevVal === "" || currVal === "";
-
-                const prev = isPending ? 0 : parseInt(prevVal) || 0;
-                const curr = isPending ? 0 : parseInt(currVal) || 0;
-
-                if (!isPending && curr < prev) {
-                    showToast(`El contador actual de ${m.name} es menor al anterior.`, "error");
-                    currInput.focus();
-                    validationError = true;
-                    return;
-                }
-
-                // Obtener datos del plan asignado
                 const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
                 const planCopies = plan.copies;
                 const planCost = m.customCost !== null ? m.customCost : plan.cost;
                 const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+                const type = getMachineType(m.name);
+                const hasRep = document.getElementById(`has-replacement-${m.id}`)?.checked || false;
 
-                // Fórmulas
-                const consumption = isPending ? 0 : curr - prev;
+                let isPending = false;
+                let prev = 0, curr = 0;
+                let prevImp = 0, currImp = 0;
+                let prevCop = 0, currCop = 0;
+                let prevPP = 0, currPP = 0;
+                let prevPF = 0, currPF = 0;
+
+                let repModel = "";
+                let repSerial = "";
+                let repPrev = 0, repCurr = 0;
+                let repPrevImp = 0, repCurrImp = 0;
+                let repPrevCop = 0, repCurrCop = 0;
+                let repPrevPP = 0, repCurrPP = 0;
+                let repPrevPF = 0, repCurrPF = 0;
+
+                if (type === "color") {
+                    const prevPPInput = document.getElementById(`prev-pp-${m.id}`);
+                    const currPPInput = document.getElementById(`curr-pp-${m.id}`);
+                    const prevPFInput = document.getElementById(`prev-pf-${m.id}`);
+                    const currPFInput = document.getElementById(`curr-pf-${m.id}`);
+
+                    const prevPPVal = prevPPInput ? prevPPInput.value.trim() : "";
+                    const currPPVal = currPPInput ? currPPInput.value.trim() : "";
+                    const prevPFVal = prevPFInput ? prevPFInput.value.trim() : "";
+                    const currPFVal = currPFInput ? currPFInput.value.trim() : "";
+
+                    isPending = prevPPVal === "" || currPPVal === "" || prevPFVal === "" || currPFVal === "";
+
+                    if (!isPending) {
+                        prevPP = parseInt(prevPPVal) || 0;
+                        currPP = parseInt(currPPVal) || 0;
+                        prevPF = parseInt(prevPFVal) || 0;
+                        currPF = parseInt(currPFVal) || 0;
+
+                        if (currPP < prevPP) {
+                            showToast(`El contador PP actual de ${m.name} es menor al anterior.`, "error");
+                            currPPInput.focus();
+                            validationError = true;
+                            return;
+                        }
+                        if (currPF < prevPF) {
+                            showToast(`El contador PF actual de ${m.name} es menor al anterior.`, "error");
+                            currPFInput.focus();
+                            validationError = true;
+                            return;
+                        }
+
+                        // El total es la suma de ambos
+                        prev = prevPP + prevPF;
+                        curr = currPP + currPF;
+                    }
+
+                    if (hasRep) {
+                        const repModelVal = document.getElementById(`rep-model-${m.id}`)?.value.trim() || "";
+                        const repSerialVal = document.getElementById(`rep-serial-${m.id}`)?.value.trim() || "";
+                        const repPrevPPVal = document.getElementById(`rep-prev-pp-${m.id}`)?.value.trim() || "";
+                        const repCurrPPVal = document.getElementById(`rep-curr-pp-${m.id}`)?.value.trim() || "";
+                        const repPrevPFVal = document.getElementById(`rep-prev-pf-${m.id}`)?.value.trim() || "";
+                        const repCurrPFVal = document.getElementById(`rep-curr-pf-${m.id}`)?.value.trim() || "";
+
+                        if (repModelVal === "" || repSerialVal === "") {
+                            showToast(`Complete el Modelo y S/N nuevo para ${m.name}.`, "error");
+                            document.getElementById(`rep-model-${m.id}`).focus();
+                            validationError = true;
+                            return;
+                        }
+
+                        if (repPrevPPVal === "" || repCurrPPVal === "" || repPrevPFVal === "" || repCurrPFVal === "") {
+                            isPending = true;
+                        } else {
+                            repModel = repModelVal;
+                            repSerial = repSerialVal;
+                            repPrevPP = parseInt(repPrevPPVal) || 0;
+                            repCurrPP = parseInt(repCurrPPVal) || 0;
+                            repPrevPF = parseInt(repPrevPFVal) || 0;
+                            repCurrPF = parseInt(repCurrPFVal) || 0;
+
+                            if (repCurrPP < repPrevPP) {
+                                showToast(`El contador PP actual del equipo nuevo es menor al inicial.`, "error");
+                                document.getElementById(`rep-curr-pp-${m.id}`).focus();
+                                validationError = true;
+                                return;
+                            }
+                            if (repCurrPF < repPrevPF) {
+                                showToast(`El contador PF actual del equipo nuevo es menor al inicial.`, "error");
+                                document.getElementById(`rep-curr-pf-${m.id}`).focus();
+                                validationError = true;
+                                return;
+                            }
+
+                            repPrev = repPrevPP + repPrevPF;
+                            repCurr = repCurrPP + repCurrPF;
+                        }
+                    }
+                } else {
+                    // Laser
+                    const prevInput = document.getElementById(`prev-${m.id}`);
+                    const currInput = document.getElementById(`curr-${m.id}`);
+
+                    const prevVal = prevInput ? prevInput.value.trim() : "";
+                    const currVal = currInput ? currInput.value.trim() : "";
+
+                    isPending = prevVal === "" || currVal === "";
+
+                    if (!isPending) {
+                        prev = parseInt(prevVal) || 0;
+                        curr = parseInt(currVal) || 0;
+
+                        if (curr < prev) {
+                            showToast(`El contador actual de ${m.name} es menor al anterior.`, "error");
+                            currInput.focus();
+                            validationError = true;
+                            return;
+                        }
+
+                        // Sub-contadores informativos
+                        prevImp = parseInt(document.getElementById(`prev-impresiones-${m.id}`)?.value) || 0;
+                        currImp = parseInt(document.getElementById(`curr-impresiones-${m.id}`)?.value) || 0;
+                        prevCop = parseInt(document.getElementById(`prev-copias-${m.id}`)?.value) || 0;
+                        currCop = parseInt(document.getElementById(`curr-copias-${m.id}`)?.value) || 0;
+                    }
+
+                    if (hasRep) {
+                        const repModelVal = document.getElementById(`rep-model-${m.id}`)?.value.trim() || "";
+                        const repSerialVal = document.getElementById(`rep-serial-${m.id}`)?.value.trim() || "";
+                        const repPrevVal = document.getElementById(`rep-prev-${m.id}`)?.value.trim() || "";
+                        const repCurrVal = document.getElementById(`rep-curr-${m.id}`)?.value.trim() || "";
+
+                        if (repModelVal === "" || repSerialVal === "") {
+                            showToast(`Complete el Modelo y S/N nuevo para ${m.name}.`, "error");
+                            document.getElementById(`rep-model-${m.id}`).focus();
+                            validationError = true;
+                            return;
+                        }
+
+                        if (repPrevVal === "" || repCurrVal === "") {
+                            isPending = true;
+                        } else {
+                            repModel = repModelVal;
+                            repSerial = repSerialVal;
+                            repPrev = parseInt(repPrevVal) || 0;
+                            repCurr = parseInt(repCurrVal) || 0;
+
+                            if (repCurr < repPrev) {
+                                showToast(`El contador actual del equipo nuevo es menor al inicial.`, "error");
+                                document.getElementById(`rep-curr-${m.id}`).focus();
+                                validationError = true;
+                                return;
+                            }
+
+                            repPrevImp = parseInt(document.getElementById(`rep-prev-impresiones-${m.id}`)?.value) || 0;
+                            repCurrImp = parseInt(document.getElementById(`rep-curr-impresiones-${m.id}`)?.value) || 0;
+                            repPrevCop = parseInt(document.getElementById(`rep-prev-copias-${m.id}`)?.value) || 0;
+                            repCurrCop = parseInt(document.getElementById(`rep-curr-copias-${m.id}`)?.value) || 0;
+                        }
+                    }
+                }
+
+                // Fórmulas de cálculo final
+                let consumption = 0;
+                let repConsumption = 0;
                 let excess = 0;
                 let excessCost = 0;
-                let finalPlanCost = planCost;
                 let totalCost = planCost;
 
-                if (planCopies === 0) {
-                    excess = isPending ? 0 : consumption;
-                    excessCost = isPending ? 0 : consumption * excessPrice;
-                    finalPlanCost = planCost;
-                    totalCost = isPending ? planCost : planCost + excessCost;
-                } else {
-                    excess = isPending ? 0 : Math.max(0, consumption - planCopies);
-                    excessCost = isPending ? 0 : excess * excessPrice;
-                    totalCost = isPending ? planCost : planCost + excessCost;
+                if (!isPending) {
+                    consumption = Math.max(0, curr - prev);
+                    if (hasRep) {
+                        repConsumption = Math.max(0, repCurr - repPrev);
+                    }
+
+                    if (type === "color") {
+                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+                        let consPP = Math.max(0, currPP - prevPP);
+                        let consPF = Math.max(0, currPF - prevPF);
+                        if (hasRep) {
+                            consPP += Math.max(0, repCurrPP - repPrevPP);
+                            consPF += Math.max(0, repCurrPF - repPrevPF);
+                        }
+
+                        excessCost = (consPP * ppPrice) + (consPF * pfPrice);
+                        excess = consumption + repConsumption;
+                        totalCost = planCost + excessCost;
+                    } else {
+                        // Laser
+                        if (planCopies === 0) {
+                            let totalCons = consumption;
+                            if (hasRep) {
+                                totalCons += repConsumption;
+                            }
+                            excess = totalCons;
+                            excessCost = totalCons * excessPrice;
+                            totalCost = planCost + excessCost;
+                        } else {
+                            if (hasRep) {
+                                const excessAnt = Math.max(0, consumption - planCopies);
+                                const remainingPlan = Math.max(0, planCopies - consumption);
+                                const excessNvo = Math.max(0, repConsumption - remainingPlan);
+
+                                excess = excessAnt + excessNvo;
+                            } else {
+                                excess = Math.max(0, consumption - planCopies);
+                            }
+                            excessCost = excess * excessPrice;
+                            totalCost = planCost + excessCost;
+                        }
+                    }
                 }
 
                 machineReadings.push({
@@ -599,14 +802,32 @@ function setupEventListeners() {
                     planCopies: planCopies,
                     excess: excess,
                     excessPrice: excessPrice,
-                    planCost: finalPlanCost,
+                    planCost: planCost,
                     excessCost: excessCost,
                     totalCost: totalCost,
                     isFixed: false,
-                    isPending: isPending
+                    isPending: isPending,
+
+                    // Sub-contadores
+                    prevImpresiones: prevImp, currImpresiones: currImp,
+                    prevCopias: prevCop, currCopias: currCop,
+                    prevPP: prevPP, currPP: currPP,
+                    prevPF: prevPF, currPF: currPF,
+
+                    // Reemplazo
+                    hasReplacement: hasRep,
+                    repModel: repModel,
+                    repSerialNumber: repSerial,
+                    repPrevCounter: repPrev,
+                    repCurrCounter: repCurr,
+                    repConsumption: repConsumption,
+                    repPrevImpresiones: repPrevImp, repCurrImpresiones: repCurrImp,
+                    repPrevCopias: repPrevCop, repCurrCopias: repCurrCop,
+                    repPrevPP: repPrevPP, repCurrPP: repCurrPP,
+                    repPrevPF: repPrevPF, repCurrPF: repCurrPF
                 });
 
-                totalAbono += finalPlanCost;
+                totalAbono += planCost;
                 totalExcessCost += excessCost;
                 totalGeneral += totalCost;
             }
@@ -614,7 +835,7 @@ function setupEventListeners() {
 
         if (validationError) return;
 
-        // Crear registroconsolidado
+        // Crear registro consolidado
         const record = {
             id: 'r-' + clientObj.id + '-' + month.toLowerCase() + '-' + year,
             clientId: clientObj.id,
@@ -716,6 +937,8 @@ function setupEventListeners() {
     document.getElementById("form-config-general").addEventListener("submit", (e) => {
         e.preventDefault();
         AppState.config.defaultExcessPrice = parseFloat(document.getElementById("config-default-excess-price").value) || 90;
+        AppState.config.defaultPPPrice = parseFloat(document.getElementById("config-default-pp-price").value) || 300;
+        AppState.config.defaultPFPrice = parseFloat(document.getElementById("config-default-pf-price").value) || 600;
         AppState.config.companyName = document.getElementById("config-company-name").value || "LEXORER S.R.L.";
         AppState.config.companySub = document.getElementById("config-company-sub").value || "TW - Informes de Consumo de Impresión";
         AppState.config.currentUser = document.getElementById("config-current-user").value || "Administrador";
@@ -1078,17 +1301,48 @@ function setupMultiMachineInputSheet(clientObj) {
     }
 
     clientObj.machines.forEach(m => {
-        const tr = document.createElement("tr");
-        
         // Cargar últimos valores o inicializar
-        let prevVal = "";
-        let currVal = "";
+        let prevVal = "", currVal = "";
+        let prevImpVal = "", currImpVal = "";
+        let prevCopVal = "", currCopVal = "";
+        let prevPPVal = "", currPPVal = "";
+        let prevPFVal = "", currPFVal = "";
+        
+        let hasRepChecked = "";
+        let repModelVal = "", repSerialVal = "";
+        let repPrevVal = "", repCurrVal = "";
+        let repPrevImpVal = "", repCurrImpVal = "";
+        let repPrevCopVal = "", repCurrCopVal = "";
+        let repPrevPPVal = "", repCurrPPVal = "";
+        let repPrevPFVal = "", repCurrPFVal = "";
 
         if (existingReading) {
             const mReading = existingReading.machineReadings.find(mr => mr.machineId === m.id);
             if (mReading) {
-                prevVal = mReading.isPending ? "" : mReading.prevCounter;
-                currVal = mReading.isPending ? "" : mReading.currCounter;
+                prevVal = mReading.isPending ? "" : (mReading.prevCounter !== undefined ? mReading.prevCounter : "");
+                currVal = mReading.isPending ? "" : (mReading.currCounter !== undefined ? mReading.currCounter : "");
+                prevImpVal = mReading.isPending ? "" : (mReading.prevImpresiones !== undefined ? mReading.prevImpresiones : "");
+                currImpVal = mReading.isPending ? "" : (mReading.currImpresiones !== undefined ? mReading.currImpresiones : "");
+                prevCopVal = mReading.isPending ? "" : (mReading.prevCopias !== undefined ? mReading.prevCopias : "");
+                currCopVal = mReading.isPending ? "" : (mReading.currCopias !== undefined ? mReading.currCopias : "");
+                prevPPVal = mReading.isPending ? "" : (mReading.prevPP !== undefined ? mReading.prevPP : "");
+                currPPVal = mReading.isPending ? "" : (mReading.currPP !== undefined ? mReading.currPP : "");
+                prevPFVal = mReading.isPending ? "" : (mReading.prevPF !== undefined ? mReading.prevPF : "");
+                currPFVal = mReading.isPending ? "" : (mReading.currPF !== undefined ? mReading.currPF : "");
+                
+                hasRepChecked = mReading.hasReplacement ? "checked" : "";
+                repModelVal = mReading.repModel || "";
+                repSerialVal = mReading.repSerialNumber || "";
+                repPrevVal = mReading.isPending ? "" : (mReading.repPrevCounter !== undefined ? mReading.repPrevCounter : "");
+                repCurrVal = mReading.isPending ? "" : (mReading.repCurrCounter !== undefined ? mReading.repCurrCounter : "");
+                repPrevImpVal = mReading.isPending ? "" : (mReading.repPrevImpresiones !== undefined ? mReading.repPrevImpresiones : "");
+                repCurrImpVal = mReading.isPending ? "" : (mReading.repCurrImpresiones !== undefined ? mReading.repCurrImpresiones : "");
+                repPrevCopVal = mReading.isPending ? "" : (mReading.repPrevCopias !== undefined ? mReading.repPrevCopias : "");
+                repCurrCopias = mReading.isPending ? "" : (mReading.repCurrCopias !== undefined ? mReading.repCurrCopias : "");
+                repPrevPPVal = mReading.isPending ? "" : (mReading.repPrevPP !== undefined ? mReading.repPrevPP : "");
+                repCurrPPVal = mReading.isPending ? "" : (mReading.repCurrPP !== undefined ? mReading.repCurrPP : "");
+                repPrevPFVal = mReading.isPending ? "" : (mReading.repPrevPF !== undefined ? mReading.repPrevPF : "");
+                repCurrPFVal = mReading.isPending ? "" : (mReading.repCurrPF !== undefined ? mReading.repCurrPF : "");
             }
         } else {
             // Intentar buscar la lectura anterior (el último actual registrado históricamente)
@@ -1096,14 +1350,23 @@ function setupMultiMachineInputSheet(clientObj) {
                 .filter(r => r.clientId === clientObj.id)
                 .sort((a,b) => b.periodYear - a.periodYear); // simplificado, tomamos el más reciente
             if (historical.length > 0) {
-                const lastM = historical[0].machineReadings.find(mr => mr.machineId === m.id);
+                let lastM = null;
+                for (const hist of historical) {
+                    lastM = hist.machineReadings.find(mr => mr.machineId === m.id);
+                    if (lastM) break;
+                }
                 if (lastM) {
-                    prevVal = lastM.isPending ? "" : lastM.currCounter;
+                    prevVal = lastM.isPending ? "" : (lastM.currCounter !== undefined ? lastM.currCounter : "");
+                    prevImpVal = lastM.isPending ? "" : (lastM.currImpresiones !== undefined ? lastM.currImpresiones : "");
+                    prevCopVal = lastM.isPending ? "" : (lastM.currCopias !== undefined ? lastM.currCopias : "");
+                    prevPPVal = lastM.isPending ? "" : (lastM.currPP !== undefined ? lastM.currPP : "");
+                    prevPFVal = lastM.isPending ? "" : (lastM.currPF !== undefined ? lastM.currPF : "");
                 }
             }
         }
 
         if (m.isFixed) {
+            const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>
                     <div style="font-weight:600;">${m.name}</div>
@@ -1112,27 +1375,233 @@ function setupMultiMachineInputSheet(clientObj) {
                 <td colspan="2" class="text-center text-muted" style="font-size:0.75rem;">Fijo (Sin contadores)</td>
                 <td class="text-right font-weight-bold" style="padding-right: 5px;">${PDFGenerator.formatCurrency(m.customCost)}</td>
             `;
+            tbody.appendChild(tr);
         } else {
             const plan = AppState.plans.find(p => p.id === m.planId) || { name: "Plan", cost: 0 };
             const abono = m.customCost !== null ? m.customCost : plan.cost;
+            const type = getMachineType(m.name);
 
-            tr.innerHTML = `
-                <td>
-                    <div style="font-weight:600;">${m.name}</div>
-                    <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
+            if (type === "color") {
+                // Fila principal PP
+                const trPP = document.createElement("tr");
+                trPP.className = "main-machine-row";
+                trPP.innerHTML = `
+                    <td>
+                        <div style="font-weight:600;">${m.name}</div>
+                        <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
+                        <label style="font-size:0.75rem; margin-top:5px; display:inline-block; cursor:pointer; color: var(--color-cyan);">
+                            <input type="checkbox" id="has-replacement-${m.id}" onchange="toggleReplacementRow('${m.id}')" ${hasRepChecked}> Hubo cambio de equipo
+                        </label>
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PP Anterior:</span>
+                        <input type="number" id="prev-pp-${m.id}" value="${prevPPVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PP Actual:</span>
+                        <input type="number" id="curr-pp-${m.id}" value="${currPPVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td class="text-right" id="total-preview-${m.id}" style="font-weight:600; padding-right: 5px; vertical-align: middle;">${PDFGenerator.formatCurrency(abono)}</td>
+                `;
+                tbody.appendChild(trPP);
+
+                // Fila sub-contador PF
+                const trPF = document.createElement("tr");
+                trPF.className = "sub-counter-row";
+                trPF.innerHTML = `
+                    <td>
+                        <div style="padding-left:15px; font-size:0.8rem; color:var(--text-muted);"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>Papel Foto (PF)</div>
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PF Anterior:</span>
+                        <input type="number" id="prev-pf-${m.id}" value="${prevPFVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PF Actual:</span>
+                        <input type="number" id="curr-pf-${m.id}" value="${currPFVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td></td>
+                `;
+                tbody.appendChild(trPF);
+            } else {
+                // Laser
+                // Fila principal Contador
+                const trCont = document.createElement("tr");
+                trCont.className = "main-machine-row";
+                trCont.innerHTML = `
+                    <td>
+                        <div style="font-weight:600;">${m.name}</div>
+                        <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
+                        <label style="font-size:0.75rem; margin-top:5px; display:inline-block; cursor:pointer; color: var(--color-cyan);">
+                            <input type="checkbox" id="has-replacement-${m.id}" onchange="toggleReplacementRow('${m.id}')" ${hasRepChecked}> Hubo cambio de equipo
+                        </label>
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Contador Anterior:</span>
+                        <input type="number" id="prev-${m.id}" value="${prevVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Contador Actual:</span>
+                        <input type="number" id="curr-${m.id}" value="${currVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td class="text-right" id="total-preview-${m.id}" style="font-weight:600; padding-right: 5px; vertical-align: middle;">${PDFGenerator.formatCurrency(abono)}</td>
+                `;
+                tbody.appendChild(trCont);
+
+                // Fila sub-contador Impresiones
+                const trImp = document.createElement("tr");
+                trImp.className = "sub-counter-row";
+                trImp.innerHTML = `
+                    <td>
+                        <div style="padding-left:15px; font-size:0.8rem; color:var(--text-muted);"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>Impresiones</div>
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Imp. Anterior:</span>
+                        <input type="number" id="prev-impresiones-${m.id}" value="${prevImpVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Imp. Actual:</span>
+                        <input type="number" id="curr-impresiones-${m.id}" value="${currImpVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td></td>
+                `;
+                tbody.appendChild(trImp);
+
+                // Fila sub-contador Copias
+                const trCop = document.createElement("tr");
+                trCop.className = "sub-counter-row";
+                trCop.innerHTML = `
+                    <td>
+                        <div style="padding-left:15px; font-size:0.8rem; color:var(--text-muted);"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>Copias</div>
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Copias Anterior:</span>
+                        <input type="number" id="prev-copias-${m.id}" value="${prevCopVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Copias Actual:</span>
+                        <input type="number" id="curr-copias-${m.id}" value="${currCopVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td></td>
+                `;
+                tbody.appendChild(trCop);
+            }
+
+            // Fila colapsable de reemplazo
+            const trRep = document.createElement("tr");
+            trRep.id = `rep-row-${m.id}`;
+            trRep.className = hasRepChecked ? "" : "hidden";
+            trRep.style.backgroundColor = "rgba(255,255,255,0.02)";
+            trRep.style.borderLeft = "4px solid var(--color-cyan)";
+            
+            let repInputsHtml = "";
+            if (type === "color") {
+                repInputsHtml = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PP Inicial</label>
+                            <input type="number" id="rep-prev-pp-${m.id}" value="${repPrevPPVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PP Final</label>
+                            <input type="number" id="rep-curr-pp-${m.id}" value="${repCurrPPVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PF Inicial</label>
+                            <input type="number" id="rep-prev-pf-${m.id}" value="${repPrevPFVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PF Final</label>
+                            <input type="number" id="rep-curr-pf-${m.id}" value="${repCurrPFVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                    </div>
+                `;
+            } else {
+                repInputsHtml = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Contador Inicial</label>
+                            <input type="number" id="rep-prev-${m.id}" value="${repPrevVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Contador Final</label>
+                            <input type="number" id="rep-curr-${m.id}" value="${repCurrVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Imp. Inicial</label>
+                            <input type="number" id="rep-prev-impresiones-${m.id}" value="${repPrevImpVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Imp. Final</label>
+                            <input type="number" id="rep-curr-impresiones-${m.id}" value="${repCurrImpVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Copias Inicial</label>
+                            <input type="number" id="rep-prev-copias-${m.id}" value="${repPrevCopVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Copias Final</label>
+                            <input type="number" id="rep-curr-copias-${m.id}" value="${repCurrCopVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                    </div>
+                `;
+            }
+
+            trRep.innerHTML = `
+                <td colspan="4" style="padding: 10px 15px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px;">
+                        <div style="border-right: 1px solid var(--border-color); padding-right: 15px;">
+                            <h5 style="margin-bottom:8px; color:var(--text-muted); font-size:0.75rem; font-weight:700; text-transform:uppercase;">Equipo Reemplazado (Anterior)</h5>
+                            <div style="font-size:0.8rem; margin-bottom:5px; color: var(--text-secondary);"><strong>Modelo:</strong> ${m.name}</div>
+                            <div style="font-size:0.8rem; margin-bottom:10px; color: var(--text-secondary);"><strong>S/N:</strong> ${m.serialNumber || 'Sin serie'}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); line-height: 1.3;">Las lecturas del equipo anterior se ingresan en los campos principales de arriba.</div>
+                        </div>
+                        <div>
+                            <h5 style="margin-bottom:8px; color:var(--color-cyan); font-size:0.75rem; font-weight:700; text-transform:uppercase;">Equipo Reemplazante (Nuevo)</h5>
+                            
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom:10px;">
+                                <div>
+                                    <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Modelo Nuevo</label>
+                                    <input type="text" id="rep-model-${m.id}" value="${repModelVal}" placeholder="Ej: Ricoh 3710 dn" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; display:block; color:var(--text-muted);">S/N Nuevo</label>
+                                    <input type="text" id="rep-serial-${m.id}" value="${repSerialVal}" placeholder="Ej: SN-12345" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                                </div>
+                            </div>
+                            
+                            <div style="font-size:0.7rem; font-weight:700; margin-bottom:5px; text-transform: uppercase; color:var(--text-muted);">Lecturas del Nuevo Equipo:</div>
+                            
+                            ${repInputsHtml}
+                        </div>
+                    </div>
                 </td>
-                <td><input type="number" id="prev-${m.id}" value="${prevVal}" min="0" oninput="recalcMultiSheetPreview()"></td>
-                <td><input type="number" id="curr-${m.id}" value="${currVal}" min="0" oninput="recalcMultiSheetPreview()"></td>
-                <td class="text-right" id="total-preview-${m.id}" style="font-weight:600; padding-right: 5px;">${PDFGenerator.formatCurrency(abono)}</td>
             `;
+            tbody.appendChild(trRep);
         }
-        tbody.appendChild(tr);
     });
+
 
     document.getElementById("multi-machine-entry-container").classList.remove("hidden");
     document.getElementById("multi-machine-placeholder").classList.add("hidden");
     recalcMultiSheetPreview();
 }
+
+/**
+ * Muestra/oculta la fila de reemplazo del equipo
+ */
+window.toggleReplacementRow = function(machineId) {
+    const chk = document.getElementById(`has-replacement-${machineId}`);
+    const row = document.getElementById(`rep-row-${machineId}`);
+    if (chk && row) {
+        if (chk.checked) {
+            row.classList.remove("hidden");
+        } else {
+            row.classList.add("hidden");
+        }
+    }
+    recalcMultiSheetPreview();
+};
 
 /**
  * Calcula y muestra el subtotal dinámico de la planilla rápida en el Dashboard
@@ -1149,38 +1618,124 @@ window.recalcMultiSheetPreview = function() {
         if (m.isFixed) {
             grandTotal += m.customCost || 0;
         } else {
-            const prevInput = document.getElementById(`prev-${m.id}`);
-            const currInput = document.getElementById(`curr-${m.id}`);
-            if (!prevInput || !currInput) return;
-
-            const prevVal = prevInput.value.trim();
-            const currVal = currInput.value.trim();
-
             const plan = AppState.plans.find(p => p.id === m.planId) || { cost: 0, copies: 0 };
             const planCost = m.customCost !== null ? m.customCost : plan.cost;
             const planCopies = plan.copies;
+            const type = getMachineType(m.name);
+            const hasRep = document.getElementById(`has-replacement-${m.id}`)?.checked || false;
 
-            if (prevVal === "" || currVal === "") {
-                hasPending = true;
-                document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
-                grandTotal += planCost;
-            } else {
-                const prev = parseInt(prevVal) || 0;
-                const curr = parseInt(currVal) || 0;
-                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+            let isMachinePending = false;
 
-                const consumption = Math.max(0, curr - prev);
-                let total = 0;
-                if (planCopies === 0) {
-                    total = planCost + (consumption * excessPrice);
-                } else {
-                    const excess = Math.max(0, consumption - planCopies);
-                    const excessCost = excess * excessPrice;
-                    total = planCost + excessCost;
+            if (type === "color") {
+                const prevPPVal = document.getElementById(`prev-pp-${m.id}`)?.value.trim() || "";
+                const currPPVal = document.getElementById(`curr-pp-${m.id}`)?.value.trim() || "";
+                const prevPFVal = document.getElementById(`prev-pf-${m.id}`)?.value.trim() || "";
+                const currPFVal = document.getElementById(`curr-pf-${m.id}`)?.value.trim() || "";
+
+                if (prevPPVal === "" || currPPVal === "" || prevPFVal === "" || currPFVal === "") {
+                    isMachinePending = true;
                 }
 
-                grandTotal += total;
-                document.getElementById(`total-preview-${m.id}`).innerText = PDFGenerator.formatCurrency(total);
+                if (hasRep) {
+                    const repPrevPPVal = document.getElementById(`rep-prev-pp-${m.id}`)?.value.trim() || "";
+                    const repCurrPPVal = document.getElementById(`rep-curr-pp-${m.id}`)?.value.trim() || "";
+                    const repPrevPFVal = document.getElementById(`rep-prev-pf-${m.id}`)?.value.trim() || "";
+                    const repCurrPFVal = document.getElementById(`rep-curr-pf-${m.id}`)?.value.trim() || "";
+
+                    if (repPrevPPVal === "" || repCurrPPVal === "" || repPrevPFVal === "" || repCurrPFVal === "") {
+                        isMachinePending = true;
+                    }
+                }
+
+                if (isMachinePending) {
+                    hasPending = true;
+                    document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
+                    grandTotal += planCost;
+                } else {
+                    const prevPP = parseInt(prevPPVal) || 0;
+                    const currPP = parseInt(currPPVal) || 0;
+                    const prevPF = parseInt(prevPFVal) || 0;
+                    const currPF = parseInt(currPFVal) || 0;
+
+                    let consPP = Math.max(0, currPP - prevPP);
+                    let consPF = Math.max(0, currPF - prevPF);
+
+                    if (hasRep) {
+                        const repPrevPP = parseInt(document.getElementById(`rep-prev-pp-${m.id}`).value) || 0;
+                        const repCurrPP = parseInt(document.getElementById(`rep-curr-pp-${m.id}`).value) || 0;
+                        const repPrevPF = parseInt(document.getElementById(`rep-prev-pf-${m.id}`).value) || 0;
+                        const repCurrPF = parseInt(document.getElementById(`rep-curr-pf-${m.id}`).value) || 0;
+
+                        consPP += Math.max(0, repCurrPP - repPrevPP);
+                        consPF += Math.max(0, repCurrPF - repPrevPF);
+                    }
+
+                    const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                    const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+                    const total = planCost + (consPP * ppPrice) + (consPF * pfPrice);
+                    grandTotal += total;
+                    document.getElementById(`total-preview-${m.id}`).innerText = PDFGenerator.formatCurrency(total);
+                }
+            } else {
+                // Laser / BN
+                const prevVal = document.getElementById(`prev-${m.id}`)?.value.trim() || "";
+                const currVal = document.getElementById(`curr-${m.id}`)?.value.trim() || "";
+
+                if (prevVal === "" || currVal === "") {
+                    isMachinePending = true;
+                }
+
+                if (hasRep) {
+                    const repPrevVal = document.getElementById(`rep-prev-${m.id}`)?.value.trim() || "";
+                    const repCurrVal = document.getElementById(`rep-curr-${m.id}`)?.value.trim() || "";
+
+                    if (repPrevVal === "" || repCurrVal === "") {
+                        isMachinePending = true;
+                    }
+                }
+
+                if (isMachinePending) {
+                    hasPending = true;
+                    document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
+                    grandTotal += planCost;
+                } else {
+                    const prev = parseInt(prevVal) || 0;
+                    const curr = parseInt(currVal) || 0;
+                    const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+
+                    const consumption = Math.max(0, curr - prev);
+                    let total = 0;
+
+                    if (planCopies === 0) {
+                        let totalCons = consumption;
+                        if (hasRep) {
+                            const repPrev = parseInt(document.getElementById(`rep-prev-${m.id}`).value) || 0;
+                            const repCurr = parseInt(document.getElementById(`rep-curr-${m.id}`).value) || 0;
+                            totalCons += Math.max(0, repCurr - repPrev);
+                        }
+                        total = planCost + (totalCons * excessPrice);
+                    } else {
+                        let excess = 0;
+                        if (hasRep) {
+                            const repPrev = parseInt(document.getElementById(`rep-prev-${m.id}`).value) || 0;
+                            const repCurr = parseInt(document.getElementById(`rep-curr-${m.id}`).value) || 0;
+                            const repConsumption = Math.max(0, repCurr - repPrev);
+
+                            const excessAnt = Math.max(0, consumption - planCopies);
+                            const remainingPlan = Math.max(0, planCopies - consumption);
+                            const excessNvo = Math.max(0, repConsumption - remainingPlan);
+
+                            excess = excessAnt + excessNvo;
+                        } else {
+                            excess = Math.max(0, consumption - planCopies);
+                        }
+                        total = planCost + (excess * excessPrice);
+                    }
+
+                    grandTotal += total;
+                    document.getElementById(`total-preview-${m.id}`).innerText = PDFGenerator.formatCurrency(total);
+                }
             }
         }
     });
@@ -1217,16 +1772,61 @@ function recalculateAllReadings() {
                 mr.planCost = m.customCost !== null ? m.customCost : plan.cost;
                 mr.excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
-                mr.consumption = mr.currCounter - mr.prevCounter;
-                
-                if (mr.planCopies === 0) {
-                    mr.excess = mr.consumption;
-                    mr.excessCost = mr.consumption * mr.excessPrice;
-                    mr.totalCost = mr.planCost + mr.excessCost;
+                const type = getMachineType(m.name);
+                const hasRep = mr.hasReplacement || false;
+
+                if (mr.isPending) {
+                    mr.consumption = 0;
+                    mr.excess = 0;
+                    mr.excessCost = 0;
+                    mr.totalCost = mr.planCost;
                 } else {
-                    mr.excess = Math.max(0, mr.consumption - mr.planCopies);
-                    mr.excessCost = mr.excess * mr.excessPrice;
-                    mr.totalCost = mr.planCost + mr.excessCost;
+                    mr.consumption = Math.max(0, mr.currCounter - mr.prevCounter);
+                    if (hasRep) {
+                        mr.repConsumption = Math.max(0, mr.repCurrCounter - mr.repPrevCounter);
+                    } else {
+                        mr.repConsumption = 0;
+                    }
+
+                    if (type === "color") {
+                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+                        let consPP = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
+                        let consPF = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
+
+                        if (hasRep) {
+                            consPP += Math.max(0, (mr.repCurrPP || 0) - (mr.repPrevPP || 0));
+                            consPF += Math.max(0, (mr.repCurrPF || 0) - (mr.repPrevPF || 0));
+                        }
+
+                        mr.excessCost = (consPP * ppPrice) + (consPF * pfPrice);
+                        mr.excess = mr.consumption + mr.repConsumption;
+                        mr.totalCost = mr.planCost + mr.excessCost;
+                    } else {
+                        // Laser / BN
+                        if (mr.planCopies === 0) {
+                            let totalCons = mr.consumption;
+                            if (hasRep) {
+                                totalCons += mr.repConsumption;
+                            }
+                            mr.excess = totalCons;
+                            mr.excessCost = totalCons * mr.excessPrice;
+                            mr.totalCost = mr.planCost + mr.excessCost;
+                        } else {
+                            if (hasRep) {
+                                const excessAnt = Math.max(0, mr.consumption - mr.planCopies);
+                                const remainingPlan = Math.max(0, mr.planCopies - mr.consumption);
+                                const excessNvo = Math.max(0, mr.repConsumption - remainingPlan);
+
+                                mr.excess = excessAnt + excessNvo;
+                            } else {
+                                mr.excess = Math.max(0, mr.consumption - mr.planCopies);
+                            }
+                            mr.excessCost = mr.excess * mr.excessPrice;
+                            mr.totalCost = mr.planCost + mr.excessCost;
+                        }
+                    }
                 }
 
                 totalAbono += mr.planCost;
@@ -1510,7 +2110,18 @@ function renderReadingsTable() {
                                 <tbody>
             `;
 
+            let totalCopPrev = 0, totalCopCurr = 0, totalCopCons = 0;
+            let totalImpPrev = 0, totalImpCurr = 0, totalImpCons = 0;
+            let totalPPPrev = 0, totalPPCurr = 0, totalPPCons = 0;
+            let totalPFPrev = 0, totalPFCurr = 0, totalPFCons = 0;
+            let hasSub = false;
+            let firstLaserExcessPrice = AppState.config.defaultExcessPrice || 90;
+            let foundLaserPrice = false;
+
             r.machineReadings.forEach(mr => {
+                const type = getMachineType(mr.name);
+                const hasRep = mr.hasReplacement || false;
+
                 if (mr.isFixed) {
                     detailsHtml += `
                         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
@@ -1538,28 +2149,274 @@ function renderReadingsTable() {
                         </tr>
                     `;
                 } else {
-                    detailsHtml += `
-                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
-                            <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevCounter)}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currCounter)}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.consumption)}</td>
-                            <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${mr.excess > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(mr.excess)}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.excessCost)}</td>
-                            <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
-                        </tr>
-                    `;
+                    if (type === "color") {
+                        hasSub = true;
+                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+                        const consPP_ant = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
+                        const consPF_ant = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
+                        const excessCost_ant = (consPP_ant * ppPrice) + (consPF_ant * pfPrice);
+
+                        totalPPPrev += mr.prevPP || 0;
+                        totalPPCurr += mr.currPP || 0;
+                        totalPPCons += consPP_ant;
+
+                        totalPFPrev += mr.prevPF || 0;
+                        totalPFCurr += mr.currPF || 0;
+                        totalPFCons += consPF_ant;
+
+                        if (hasRep) {
+                            const repPrevPP = mr.repPrevPP || 0;
+                            const repCurrPP = mr.repCurrPP || 0;
+                            const repPrevPF = mr.repPrevPF || 0;
+                            const repCurrPF = mr.repCurrPF || 0;
+
+                            const consPP_nvo = Math.max(0, repCurrPP - repPrevPP);
+                            const consPF_nvo = Math.max(0, repCurrPF - repPrevPF);
+                            const excessCost_nvo = (consPP_nvo * ppPrice) + (consPF_nvo * pfPrice);
+
+                            totalPPPrev += repPrevPP;
+                            totalPPCurr += repCurrPP;
+                            totalPPCons += consPP_nvo;
+
+                            totalPFPrev += repPrevPF;
+                            totalPFCurr += repCurrPF;
+                            totalPFCons += consPF_nvo;
+
+                            // Fila Anterior (Color)
+                            detailsHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">[Ant] ${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.currPP} | PF:${mr.currPF}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.planCost + excessCost_ant)}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>[Nvo] ${mr.repModel} ${mr.repSerialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.repSerialNumber})</span>` : ''}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${repPrevPP} | PF:${repPrevPF}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${repCurrPP} | PF:${repCurrPF}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_nvo} | PF:${consPF_nvo}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_nvo} | PF:${consPF_nvo}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">$0</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
+                                </tr>
+                            `;
+                        } else {
+                            // Fila Única (Color)
+                            detailsHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.currPP} | PF:${mr.currPF}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.excessCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
+                                </tr>
+                            `;
+                        }
+                    } else {
+                        // Laser / BN
+                        if (!foundLaserPrice && mr.excessPrice !== undefined && mr.excessPrice !== null) {
+                            firstLaserExcessPrice = mr.excessPrice;
+                            foundLaserPrice = true;
+                        }
+
+                        const hasSubVals = (mr.prevImpresiones || mr.currImpresiones || mr.prevCopias || mr.currCopias ||
+                                            mr.repPrevImpresiones || mr.repCurrImpresiones || mr.repPrevCopias || mr.repCurrCopias);
+                        if (hasSubVals) {
+                            hasSub = true;
+                            totalImpPrev += mr.prevImpresiones || 0;
+                            totalImpCurr += mr.currImpresiones || 0;
+                            totalImpCons += Math.max(0, (mr.currImpresiones || 0) - (mr.prevImpresiones || 0));
+
+                            totalCopPrev += mr.prevCopias || 0;
+                            totalCopCurr += mr.currCopias || 0;
+                            totalCopCons += Math.max(0, (mr.currCopias || 0) - (mr.prevCopias || 0));
+                        }
+
+                        if (hasRep) {
+                            const repPrev = mr.repPrevCounter || 0;
+                            const repCurr = mr.repCurrCounter || 0;
+                            const repCons = Math.max(0, repCurr - repPrev);
+
+                            if (hasSubVals) {
+                                totalImpPrev += mr.repPrevImpresiones || 0;
+                                totalImpCurr += mr.repCurrImpresiones || 0;
+                                totalImpCons += Math.max(0, (mr.repCurrImpresiones || 0) - (mr.repPrevImpresiones || 0));
+
+                                totalCopPrev += mr.repPrevCopias || 0;
+                                totalCopCurr += mr.repCurrCopias || 0;
+                                totalCopCons += Math.max(0, (mr.repCurrCopias || 0) - (mr.repPrevCopias || 0));
+                            }
+
+                            // Redistribution logic
+                            let excessAnt = 0;
+                            let excessNvo = 0;
+
+                            if (mr.planCopies === 0) {
+                                excessAnt = mr.consumption;
+                                excessNvo = repCons;
+                            } else {
+                                excessAnt = Math.max(0, mr.consumption - mr.planCopies);
+                                const remainingPlan = Math.max(0, mr.planCopies - mr.consumption);
+                                excessNvo = Math.max(0, repCons - remainingPlan);
+                            }
+
+                            const excessCost_ant = excessAnt * mr.excessPrice;
+                            const excessCost_nvo = excessNvo * mr.excessPrice;
+
+                            // Fila Anterior (Laser)
+                            detailsHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">[Ant] ${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevCounter)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currCounter)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.consumption)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${excessAnt > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(excessAnt)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.planCost + excessCost_ant)}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>[Nvo] ${mr.repModel} ${mr.repSerialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.repSerialNumber})</span>` : ''}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repPrev)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCurr)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCons)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${excessNvo > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(excessNvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">$0</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
+                                </tr>
+                            `;
+                        } else {
+                            // Fila Única (Laser)
+                            detailsHtml += `
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevCounter)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currCounter)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.consumption)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${mr.excess > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(mr.excess)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.excessCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
+                                </tr>
+                            `;
+                        }
+                    }
                 }
             });
 
-            detailsHtml += `
+            // Si hay subcontadores activos, append de la tabla consolidada de consumos
+            if (hasSub) {
+                const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+
+                let rowsHtml = "";
+                if (totalCopCons > 0 || totalCopPrev > 0 || totalCopCurr > 0) {
+                    rowsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 6px 10px; font-weight:600;">Fotocopias (Copias)</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalCopPrev)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalCopCurr)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-cyan);">${PDFGenerator.formatNumber(totalCopCons)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatCurrency(firstLaserExcessPrice)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCopCons * firstLaserExcessPrice)}</td>
+                        </tr>
+                    `;
+                }
+                if (totalImpCons > 0 || totalImpPrev > 0 || totalImpCurr > 0) {
+                    rowsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 6px 10px; font-weight:600;">Impresiones (Printouts)</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalImpPrev)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalImpCurr)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-cyan);">${PDFGenerator.formatNumber(totalImpCons)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatCurrency(firstLaserExcessPrice)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalImpCons * firstLaserExcessPrice)}</td>
+                        </tr>
+                    `;
+                }
+                if (totalPPCons > 0 || totalPPPrev > 0 || totalPPCurr > 0) {
+                    rowsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 6px 10px; font-weight:600;">Color (Papel Común PP)</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalPPPrev)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalPPCurr)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-cyan);">${PDFGenerator.formatNumber(totalPPCons)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatCurrency(ppPrice)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalPPCons * ppPrice)}</td>
+                        </tr>
+                    `;
+                }
+                if (totalPFCons > 0 || totalPFPrev > 0 || totalPFCurr > 0) {
+                    rowsHtml += `
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                            <td style="text-align: left; padding: 6px 10px; font-weight:600;">Fotografía (Papel Fotográfico PF)</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalPFPrev)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatNumber(totalPFCurr)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-cyan);">${PDFGenerator.formatNumber(totalPFCons)}</td>
+                            <td style="text-align: right; padding: 6px 10px;">${PDFGenerator.formatCurrency(pfPrice)}</td>
+                            <td style="text-align: right; padding: 6px 10px; font-weight:600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalPFCons * pfPrice)}</td>
+                        </tr>
+                    `;
+                }
+
+                if (rowsHtml) {
+                    detailsHtml += `
+                                    </tbody>
+                                </table>
+                                
+                                <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                                    <h5 style="margin-bottom: 8px; color: var(--color-cyan); font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">
+                                        Resumen Consolidado de Sub-contadores
+                                    </h5>
+                                    <table class="details-table" style="width: 100%; font-size: 0.75rem;">
+                                        <thead>
+                                            <tr>
+                                                <th style="text-align: left; padding: 4px 8px;">Concepto</th>
+                                                <th style="text-align: right; padding: 4px 8px;">Anterior</th>
+                                                <th style="text-align: right; padding: 4px 8px;">Actual</th>
+                                                <th style="text-align: right; padding: 4px 8px;">Consumo</th>
+                                                <th style="text-align: right; padding: 4px 8px;">Precio Unit.</th>
+                                                <th style="text-align: right; padding: 4px 8px;">Total Venta</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${rowsHtml}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                } else {
+                    detailsHtml += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    `;
+                }
+            } else {
+                detailsHtml += `
                                 </tbody>
                             </table>
                         </div>
                     </td>
                 </tr>
-            `;
+                `;
+            }
 
             periodsHtml += detailsHtml;
         });
@@ -2286,13 +3143,48 @@ function processImportedRawRecords(records, sourceName) {
                 totalGeneral += cost;
             } else {
                 const hasRead = rowRead !== undefined;
-                const prev = (hasRead && rowRead.prevCounter !== undefined && rowRead.prevCounter !== null) ? rowRead.prevCounter : null;
-                const curr = (hasRead && rowRead.currCounter !== undefined && rowRead.currCounter !== null) ? rowRead.currCounter : null;
-
-                const isPending = prev === null || curr === null || isNaN(prev) || isNaN(curr);
-
-                const prevCounter = isPending ? 0 : parseInt(prev) || 0;
-                const currCounter = isPending ? 0 : parseInt(curr) || 0;
+                const type = getMachineType(m.name);
+                
+                let isPending = true;
+                let prev = 0, curr = 0;
+                let prevImp = 0, currImp = 0;
+                let prevCop = 0, currCop = 0;
+                let prevPP = 0, currPP = 0;
+                let prevPF = 0, currPF = 0;
+                
+                if (hasRead) {
+                    if (type === "color") {
+                        const hasPPPF = rowRead.prevPP !== undefined || rowRead.currPP !== undefined || rowRead.prevPF !== undefined || rowRead.currPF !== undefined;
+                        if (hasPPPF) {
+                            prevPP = parseInt(rowRead.prevPP) || 0;
+                            currPP = parseInt(rowRead.currPP) || 0;
+                            prevPF = parseInt(rowRead.prevPF) || 0;
+                            currPF = parseInt(rowRead.currPF) || 0;
+                            isPending = false;
+                        } else if (rowRead.prevCounter !== undefined && rowRead.currCounter !== undefined && rowRead.prevCounter !== null && rowRead.currCounter !== null) {
+                            prevPP = parseInt(rowRead.prevCounter) || 0;
+                            currPP = parseInt(rowRead.currCounter) || 0;
+                            prevPF = 0;
+                            currPF = 0;
+                            isPending = false;
+                        }
+                        prev = prevPP + prevPF;
+                        curr = currPP + currPF;
+                    } else {
+                        // Laser
+                        if (rowRead.prevCounter !== undefined && rowRead.currCounter !== undefined && rowRead.prevCounter !== null && rowRead.currCounter !== null) {
+                            prev = parseInt(rowRead.prevCounter) || 0;
+                            curr = parseInt(rowRead.currCounter) || 0;
+                            isPending = false;
+                            
+                            // Informativos
+                            prevImp = parseInt(rowRead.prevImpresiones) || 0;
+                            currImp = parseInt(rowRead.currImpresiones) || 0;
+                            prevCop = parseInt(rowRead.prevCopias) || 0;
+                            currCop = parseInt(rowRead.currCopias) || 0;
+                        }
+                    }
+                }
 
                 const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
                 const planCopies = plan.copies;
@@ -2300,30 +3192,64 @@ function processImportedRawRecords(records, sourceName) {
                 const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
 
                 // Fórmulas
-                const consumption = isPending ? 0 : currCounter - prevCounter;
+                let consumption = 0;
                 let excess = 0;
                 let excessCost = 0;
-                let finalPlanCost = planCost;
                 let totalCost = planCost;
 
-                if (planCopies === 0) {
-                    excess = isPending ? 0 : consumption;
-                    excessCost = isPending ? 0 : consumption * excessPrice;
-                    finalPlanCost = planCost;
-                    totalCost = isPending ? planCost : planCost + excessCost;
-                } else {
-                    excess = isPending ? 0 : Math.max(0, consumption - planCopies);
-                    excessCost = isPending ? 0 : excess * excessPrice;
-                    totalCost = isPending ? planCost : planCost + excessCost;
+                if (!isPending) {
+                    consumption = Math.max(0, curr - prev);
+                    if (type === "color") {
+                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+                        const consPP = Math.max(0, currPP - prevPP);
+                        const consPF = Math.max(0, currPF - prevPF);
+                        
+                        excessCost = (consPP * ppPrice) + (consPF * pfPrice);
+                        excess = consumption;
+                        totalCost = planCost + excessCost;
+                    } else {
+                        if (planCopies === 0) {
+                            excess = consumption;
+                            excessCost = consumption * excessPrice;
+                            totalCost = planCost + excessCost;
+                        } else {
+                            excess = Math.max(0, consumption - planCopies);
+                            excessCost = excess * excessPrice;
+                            totalCost = planCost + excessCost;
+                        }
+                    }
                 }
 
                 machineReadings.push({
                     machineId: m.id, name: m.name, serialNumber: m.serialNumber,
-                    prevCounter: prevCounter, currCounter: currCounter, consumption: consumption, planCopies: planCopies,
-                    excess: excess, excessPrice: excessPrice, planCost: finalPlanCost, excessCost: excessCost, totalCost: totalCost,
-                    isFixed: false, isPending: isPending
+                    prevCounter: prev, currCounter: curr, consumption: consumption, planCopies: planCopies,
+                    excess: excess, excessPrice: excessPrice, planCost: planCost, excessCost: excessCost, totalCost: totalCost,
+                    isFixed: false, isPending: isPending,
+                    
+                    // Sub-contadores
+                    prevImpresiones: prevImp, currImpresiones: currImp,
+                    prevCopias: prevCop, currCopias: currCop,
+                    prevPP: prevPP, currPP: currPP,
+                    prevPF: prevPF, currPF: currPF,
+                    
+                    // Reemplazo
+                    hasReplacement: false,
+                    repModel: "",
+                    repSerialNumber: "",
+                    repPrevCounter: 0,
+                    repCurrCounter: 0,
+                    repConsumption: 0,
+                    repPrevImpresiones: 0,
+                    repCurrImpresiones: 0,
+                    repPrevCopias: 0,
+                    repCurrCopias: 0,
+                    repPrevPP: 0,
+                    repCurrPP: 0,
+                    repPrevPF: 0,
+                    repCurrPF: 0
                 });
-                totalAbono += finalPlanCost;
+                totalAbono += planCost;
                 totalExcessCost += excessCost;
                 totalGeneral += totalCost;
             }

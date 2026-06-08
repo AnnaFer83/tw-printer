@@ -404,13 +404,45 @@ const DataParser = {
         const lines = rawText.split('\n');
         const records = [];
         
-        // Match numbers, allowing for dots/commas inside the number sequence
-        const pairRegex = /([\d\.\,]+)\s*(?:a|al|y|-|–|—|to|->|=>)\s*([\d\.\,]+)\s*$/i;
-        const singleRegex = /([\d\.\,]+)\s*$/;
-
         let currentClientName = "";
+        let currentGroup = ""; // "anterior" o "actual"
+        
+        let currentRecord = {
+            clientName: "",
+            machineName: "",
+            serialNumber: "",
+            prevCounter: null, currCounter: null,
+            prevImpresiones: null, currImpresiones: null,
+            prevCopias: null, currCopias: null,
+            prevPP: null, currPP: null,
+            prevPF: null, currPF: null
+        };
 
-        // Helper to clean and parse number
+        const hasData = (rec) => {
+            return rec.prevCounter !== null || rec.currCounter !== null ||
+                   rec.prevImpresiones !== null || rec.currImpresiones !== null ||
+                   rec.prevCopias !== null || rec.currCopias !== null ||
+                   rec.prevPP !== null || rec.currPP !== null ||
+                   rec.prevPF !== null || rec.currPF !== null;
+        };
+
+        const pushRecord = () => {
+            if (hasData(currentRecord)) {
+                records.push({...currentRecord});
+                const clientCtx = currentRecord.clientName;
+                currentRecord = {
+                    clientName: clientCtx,
+                    machineName: "",
+                    serialNumber: "",
+                    prevCounter: null, currCounter: null,
+                    prevImpresiones: null, currImpresiones: null,
+                    prevCopias: null, currCopias: null,
+                    prevPP: null, currPP: null,
+                    prevPF: null, currPF: null
+                };
+            }
+        };
+
         const parseNumberClean = (str) => {
             if (!str) return 0;
             const cleanStr = str.replace(/[\.\,]/g, '');
@@ -418,38 +450,101 @@ const DataParser = {
             return isNaN(val) ? 0 : val;
         };
 
-        // Fetch known clients to help identify clients when combined in a single line
         const knownClients = (window.AppState && window.AppState.clients) 
             ? window.AppState.clients.map(c => c.name.trim()) 
             : [];
+
+        const groupRegex = /^\s*(anterior|actual|inicial|final|previo|nuevo|prev|curr|ant|act)\s*:?/i;
+        
+        const kvPairRegex = /^\s*(contador|impresi[oó]n|impresiones|copias|copia|pp|pf|papel\s+com[uú]n|papel\s+fotogr[aá]fico|papel\s+foto)\s*[:\-–—\s]?\s*([\d\.\,]+)\s*(?:a|al|y|-|–|—|to|->|=>)\s*([\d\.\,]+)/i;
+        const kvSingleRegex = /^\s*(contador|impresi[oó]n|impresiones|copias|copia|pp|pf|papel\s+com[uú]n|papel\s+fotogr[aá]fico|papel\s+foto)\s*[:\-–—\s]?\s*([\d\.\,]+)/i;
+        
+        const inlinePairRegex = /([\d\.\,]+)\s*(?:a|al|y|-|–|—|to|->|=>)\s*([\d\.\,]+)\s*$/i;
+        const inlineSingleRegex = /([\d\.\,]+)\s*$/;
 
         lines.forEach(line => {
             const cleanLine = line.trim();
             if (cleanLine === "") return;
 
-            // Check if there are any numbers at the end of the line
-            const pairMatch = cleanLine.match(pairRegex);
-            const singleMatch = cleanLine.match(singleRegex);
+            // 1. Check if it's a group header
+            const gMatch = cleanLine.match(groupRegex);
+            if (gMatch) {
+                const gName = gMatch[1].toLowerCase();
+                if (["anterior", "inicial", "previo", "prev", "ant"].includes(gName)) {
+                    currentGroup = "anterior";
+                } else {
+                    currentGroup = "actual";
+                }
+                return;
+            }
 
-            if (pairMatch) {
-                const prevVal = parseNumberClean(pairMatch[1]);
-                const currVal = parseNumberClean(pairMatch[2]);
+            // 2. Check if it's an inline key-pair (e.g. "Contador: 1000 - 2000")
+            const kvPairMatch = cleanLine.match(kvPairRegex);
+            if (kvPairMatch) {
+                const key = kvPairMatch[1].toLowerCase();
+                const prevVal = parseNumberClean(kvPairMatch[2]);
+                const currVal = parseNumberClean(kvPairMatch[3]);
                 
-                // Text before the number sequence
-                const matchIndex = cleanLine.lastIndexOf(pairMatch[0]);
-                let nameText = cleanLine.substring(0, matchIndex).trim();
-                nameText = nameText.replace(/[:\-\–\—\=\,]+$/g, '').trim();
+                if (key.includes("contador")) {
+                    currentRecord.prevCounter = prevVal;
+                    currentRecord.currCounter = currVal;
+                } else if (key.includes("impresi")) {
+                    currentRecord.prevImpresiones = prevVal;
+                    currentRecord.currImpresiones = currVal;
+                } else if (key.includes("copia")) {
+                    currentRecord.prevCopias = prevVal;
+                    currentRecord.currCopias = currVal;
+                } else if (key.includes("pp") || key.includes("comun") || key.includes("común")) {
+                    currentRecord.prevPP = prevVal;
+                    currentRecord.currPP = currVal;
+                } else if (key.includes("pf") || key.includes("foto")) {
+                    currentRecord.prevPF = prevVal;
+                    currentRecord.currPF = currVal;
+                }
+                return;
+            }
 
+            // 3. Check if it's a key-single (e.g. "Contador: 2000")
+            const kvSingleMatch = cleanLine.match(kvSingleRegex);
+            if (kvSingleMatch) {
+                const key = kvSingleMatch[1].toLowerCase();
+                const val = parseNumberClean(kvSingleMatch[2]);
+                const group = currentGroup || "actual";
+                
+                if (group === "anterior") {
+                    if (key.includes("contador")) currentRecord.prevCounter = val;
+                    else if (key.includes("impresi")) currentRecord.prevImpresiones = val;
+                    else if (key.includes("copia")) currentRecord.prevCopias = val;
+                    else if (key.includes("pp") || key.includes("comun") || key.includes("común")) currentRecord.prevPP = val;
+                    else if (key.includes("pf") || key.includes("foto")) currentRecord.prevPF = val;
+                } else {
+                    if (key.includes("contador")) currentRecord.currCounter = val;
+                    else if (key.includes("impresi")) currentRecord.currImpresiones = val;
+                    else if (key.includes("copia")) currentRecord.currCopias = val;
+                    else if (key.includes("pp") || key.includes("comun") || key.includes("común")) currentRecord.currPP = val;
+                    else if (key.includes("pf") || key.includes("foto")) currentRecord.currPF = val;
+                }
+                return;
+            }
+
+            // 4. Check if it's an inline pair without key (e.g. "Client Name - Machine 1000 - 2000")
+            const inlinePairMatch = cleanLine.match(inlinePairRegex);
+            if (inlinePairMatch) {
+                pushRecord();
+                
+                const prevVal = parseNumberClean(inlinePairMatch[1]);
+                const currVal = parseNumberClean(inlinePairMatch[2]);
+                const matchIndex = cleanLine.lastIndexOf(inlinePairMatch[0]);
+                let nameText = cleanLine.substring(0, matchIndex).trim().replace(/[:\-\–\—\=\,]+$/g, '').trim();
+                
                 let clientName = "";
                 let machineName = "";
-
-                // 1. Check if nameText starts with a known client name
+                
                 let matchedKnown = false;
                 for (const known of knownClients) {
                     if (nameText.toLowerCase().startsWith(known.toLowerCase())) {
                         clientName = known;
-                        let rest = nameText.substring(known.length).trim();
-                        rest = rest.replace(/^[:\-\–\—\=\,\s]+/g, '').trim();
+                        let rest = nameText.substring(known.length).trim().replace(/^[:\-\–\—\=\,\s]+/g, '').trim();
                         machineName = rest || "Equipo Copiadora";
                         matchedKnown = true;
                         currentClientName = known;
@@ -458,7 +553,6 @@ const DataParser = {
                 }
 
                 if (!matchedKnown) {
-                    // 2. Check if there's a delimiter like hyphen or colon that separates them (client - machine)
                     const splitDelim = nameText.match(/\s+[\-\–\—\:]\s+/);
                     if (splitDelim) {
                         const splitIndex = nameText.indexOf(splitDelim[0]);
@@ -466,40 +560,40 @@ const DataParser = {
                         machineName = nameText.substring(splitIndex + splitDelim[0].length).trim();
                         currentClientName = clientName;
                     } else if (currentClientName) {
-                        // 3. Fall back to current client context
                         clientName = currentClientName;
                         machineName = nameText || "Equipo Copiadora";
                     } else {
-                        // 4. Default: Use entire nameText as client name
                         clientName = nameText || "Cliente Desconocido";
                         machineName = "Equipo Copiadora";
                     }
                 }
 
                 records.push({
-                    clientName: clientName,
-                    machineName: machineName,
+                    clientName,
+                    machineName,
                     prevCounter: prevVal,
                     currCounter: currVal
                 });
+                return;
+            }
 
-            } else if (singleMatch) {
-                const currVal = parseNumberClean(singleMatch[1]);
+            // 5. Check if it's an inline single without key (e.g. "Client Name - Machine 2000")
+            const inlineSingleMatch = cleanLine.match(inlineSingleRegex);
+            if (inlineSingleMatch) {
+                pushRecord();
                 
-                const matchIndex = cleanLine.lastIndexOf(singleMatch[0]);
-                let nameText = cleanLine.substring(0, matchIndex).trim();
-                nameText = nameText.replace(/[:\-\–\—\=\,]+$/g, '').trim();
-
+                const currVal = parseNumberClean(inlineSingleMatch[1]);
+                const matchIndex = cleanLine.lastIndexOf(inlineSingleMatch[0]);
+                let nameText = cleanLine.substring(0, matchIndex).trim().replace(/[:\-\–\—\=\,]+$/g, '').trim();
+                
                 let clientName = "";
                 let machineName = "";
-
-                // 1. Check if nameText starts with a known client name
+                
                 let matchedKnown = false;
                 for (const known of knownClients) {
                     if (nameText.toLowerCase().startsWith(known.toLowerCase())) {
                         clientName = known;
-                        let rest = nameText.substring(known.length).trim();
-                        rest = rest.replace(/^[:\-\–\—\=\,\s]+/g, '').trim();
+                        let rest = nameText.substring(known.length).trim().replace(/^[:\-\–\—\=\,\s]+/g, '').trim();
                         machineName = rest || "Equipo Copiadora";
                         matchedKnown = true;
                         currentClientName = known;
@@ -508,7 +602,6 @@ const DataParser = {
                 }
 
                 if (!matchedKnown) {
-                    // 2. Check if there's a delimiter like hyphen or colon that separates client - machine
                     const splitDelim = nameText.match(/\s+[\-\–\—\:]\s+/);
                     if (splitDelim) {
                         const splitIndex = nameText.indexOf(splitDelim[0]);
@@ -516,7 +609,6 @@ const DataParser = {
                         machineName = nameText.substring(splitIndex + splitDelim[0].length).trim();
                         currentClientName = clientName;
                     } else if (currentClientName) {
-                        // 3. Fall back to current client context
                         clientName = currentClientName;
                         machineName = nameText || "Equipo Copiadora";
                     } else {
@@ -526,22 +618,45 @@ const DataParser = {
                 }
 
                 records.push({
-                    clientName: clientName,
-                    machineName: machineName,
+                    clientName,
+                    machineName,
                     prevCounter: 0,
                     currCounter: currVal
                 });
+                return;
+            }
 
-            } else {
-                // Line has no numbers. It might be a client header!
-                let possibleClient = cleanLine.replace(/[:\-\–\—\=\,]+$/g, '').trim();
-                if (possibleClient.length > 0 && possibleClient.length < 60) {
-                    // Update current client name context
-                    currentClientName = possibleClient;
+            // 6. Otherwise, treat line as client/machine context header
+            let possibleName = cleanLine.replace(/[:\-\–\—\=\,]+$/g, '').trim();
+            if (possibleName.length > 0 && possibleName.length < 60) {
+                let matchedClient = knownClients.find(k => k.toLowerCase() === possibleName.toLowerCase());
+                if (matchedClient) {
+                    pushRecord();
+                    currentClientName = matchedClient;
+                    currentRecord.clientName = matchedClient;
+                } else {
+                    let foundClientForMachine = null;
+                    if (window.AppState && window.AppState.clients) {
+                        for (const c of window.AppState.clients) {
+                            if (c.machines.some(m => m.name.toLowerCase() === possibleName.toLowerCase() || (m.serialNumber && m.serialNumber.toLowerCase() === possibleName.toLowerCase()))) {
+                                foundClientForMachine = c;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    pushRecord();
+                    if (foundClientForMachine) {
+                        currentClientName = foundClientForMachine.name;
+                        currentRecord.clientName = foundClientForMachine.name;
+                    }
+                    currentRecord.machineName = possibleName;
                 }
             }
         });
 
+        pushRecord();
         return records;
     }
+
 };

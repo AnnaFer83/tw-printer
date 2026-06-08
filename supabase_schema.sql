@@ -73,8 +73,58 @@ CREATE TABLE IF NOT EXISTS machine_readings (
     excess_cost   NUMERIC DEFAULT 0,
     total_cost    NUMERIC DEFAULT 0,
     custom_cost   NUMERIC DEFAULT 0,
-    is_pending    BOOLEAN DEFAULT FALSE
+    is_pending    BOOLEAN DEFAULT FALSE,
+    
+    -- Sub-contadores
+    prev_impresiones NUMERIC DEFAULT 0,
+    curr_impresiones NUMERIC DEFAULT 0,
+    prev_copias      NUMERIC DEFAULT 0,
+    curr_copias      NUMERIC DEFAULT 0,
+    prev_pp          NUMERIC DEFAULT 0,
+    curr_pp          NUMERIC DEFAULT 0,
+    prev_pf          NUMERIC DEFAULT 0,
+    curr_pf          NUMERIC DEFAULT 0,
+    
+    -- Reemplazo de equipos
+    has_replacement  BOOLEAN DEFAULT FALSE,
+    rep_model        TEXT    DEFAULT '',
+    rep_serial_number TEXT   DEFAULT '',
+    rep_prev_counter NUMERIC DEFAULT 0,
+    rep_curr_counter NUMERIC DEFAULT 0,
+    rep_consumption  NUMERIC DEFAULT 0,
+    rep_prev_impresiones NUMERIC DEFAULT 0,
+    rep_curr_impresiones NUMERIC DEFAULT 0,
+    rep_prev_copias      NUMERIC DEFAULT 0,
+    rep_curr_copias      NUMERIC DEFAULT 0,
+    rep_prev_pp          NUMERIC DEFAULT 0,
+    rep_curr_pp          NUMERIC DEFAULT 0,
+    rep_prev_pf          NUMERIC DEFAULT 0,
+    rep_curr_pf          NUMERIC DEFAULT 0
 );
+
+-- Migraciones para base de datos existente (ejecutar si la tabla ya existía):
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS prev_impresiones NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS curr_impresiones NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS prev_copias NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS curr_copias NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS prev_pp NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS curr_pp NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS prev_pf NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS curr_pf NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS has_replacement BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_model TEXT DEFAULT '';
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_serial_number TEXT DEFAULT '';
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_prev_counter NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_counter NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_consumption NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_prev_impresiones NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_impresiones NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_prev_copias NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_copias NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_prev_pp NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_pp NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_prev_pf NUMERIC DEFAULT 0;
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_pf NUMERIC DEFAULT 0;
 
 -- =============================================================================
 -- Acceso para la clave anon (app frontend)

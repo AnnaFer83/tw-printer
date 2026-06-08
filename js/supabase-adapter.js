@@ -96,6 +96,32 @@ const SupabaseAdapter = {
                 totalCost:    mr.total_cost,
                 customCost:   mr.custom_cost,
                 isPending:    mr.is_pending,
+                
+                // Nuevos campos
+                prevImpresiones: mr.prev_impresiones ?? 0,
+                currImpresiones: mr.curr_impresiones ?? 0,
+                prevCopias:      mr.prev_copias ?? 0,
+                currCopias:      mr.curr_copias ?? 0,
+                prevPP:          mr.prev_pp ?? 0,
+                currPP:          mr.curr_pp ?? 0,
+                prevPF:          mr.prev_pf ?? 0,
+                currPF:          mr.curr_pf ?? 0,
+                
+                // Campos de reemplazo
+                hasReplacement:  mr.has_replacement ?? false,
+                repModel:        mr.rep_model || '',
+                repSerialNumber: mr.rep_serial_number || '',
+                repPrevCounter:  mr.rep_prev_counter ?? 0,
+                repCurrCounter:  mr.rep_curr_counter ?? 0,
+                repConsumption:  mr.rep_consumption ?? 0,
+                repPrevImpresiones: mr.rep_prev_impresiones ?? 0,
+                repCurrImpresiones: mr.rep_curr_impresiones ?? 0,
+                repPrevCopias:      mr.rep_prev_copias ?? 0,
+                repCurrCopias:      mr.rep_curr_copias ?? 0,
+                repPrevPP:          mr.rep_prev_pp ?? 0,
+                repCurrPP:          mr.rep_curr_pp ?? 0,
+                repPrevPF:          mr.rep_prev_pf ?? 0,
+                repCurrPF:          mr.rep_curr_pf ?? 0,
             });
         });
 
@@ -221,6 +247,32 @@ const SupabaseAdapter = {
                     total_cost:   mr.totalCost ?? 0,
                     custom_cost:  mr.customCost ?? 0,
                     is_pending:   mr.isPending ?? false,
+                    
+                    // Nuevos campos
+                    prev_impresiones: mr.prevImpresiones ?? 0,
+                    curr_impresiones: mr.currImpresiones ?? 0,
+                    prev_copias:      mr.prevCopias ?? 0,
+                    curr_copias:      mr.currCopias ?? 0,
+                    prev_pp:          mr.prevPP ?? 0,
+                    curr_pp:          mr.currPP ?? 0,
+                    prev_pf:          mr.prevPF ?? 0,
+                    curr_pf:          mr.currPF ?? 0,
+                    
+                    // Campos de reemplazo
+                    has_replacement:  mr.hasReplacement ?? false,
+                    rep_model:        mr.repModel || '',
+                    rep_serial_number: mr.repSerialNumber || '',
+                    rep_prev_counter:  mr.repPrevCounter ?? 0,
+                    rep_curr_counter:  mr.repCurrCounter ?? 0,
+                    rep_consumption:  mr.repConsumption ?? 0,
+                    rep_prev_impresiones: mr.repPrevImpresiones ?? 0,
+                    rep_curr_impresiones: mr.repCurrImpresiones ?? 0,
+                    rep_prev_copias:      mr.repPrevCopias ?? 0,
+                    rep_curr_copias:      mr.repCurrCopias ?? 0,
+                    rep_prev_pp:          mr.repPrevPP ?? 0,
+                    rep_curr_pp:          mr.repCurrPP ?? 0,
+                    rep_prev_pf:          mr.repPrevPF ?? 0,
+                    rep_curr_pf:          mr.repCurrPF ?? 0,
                 }))
             );
             if (mrRows.length) {
