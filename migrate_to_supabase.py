@@ -27,7 +27,7 @@ JSON_FILE = args.json
 # ---------------------------------------------------------------------------
 # Credenciales Supabase (se piden al ejecutar para no guardarlas en el código)
 # ---------------------------------------------------------------------------
-SUPABASE_URL = "https://sngigxlfemzteyokqlbd.supabase.co"
+SUPABASE_URL = "https://udeneeddfswwoyixluld.supabase.co"
 # service_role key — bypasea RLS, solo para este script de migración (nunca va al browser)
 SUPABASE_KEY = "SERVICE_ROLE_KEY"  # reemplazar con la clave real antes de ejecutar (no commitear)
 

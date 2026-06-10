@@ -10,8 +10,8 @@
 
    ============================================================================= */
 
-const SUPABASE_URL      = 'https://sngigxlfemzteyokqlbd.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuZ2lneGxmZW16dGV5b2txbGJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NDg0NTAsImV4cCI6MjA5NjEyNDQ1MH0.K-EreESHk-JjB3cZNDDJCENVSDJuKYJzUMLF78h-zkc';
+const SUPABASE_URL      = 'https://udeneeddfswwoyixluld.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_FmeSOTLF3YbKxkzSgoCqRg_O4lsohUZ';
 
 // Cliente Supabase (inicializado con el CDN cargado en index.html)
 let _sb = null;
