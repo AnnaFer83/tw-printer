@@ -550,7 +550,10 @@ const PDFGenerator = {
             </div>
 
             <div style="text-align:center;border-top:1px solid #cbd5e1;padding-top:15px;margin-top:40px;">
-                <p style="font-size:9px;color:#94a3b8;">TecnoWork - Reporte Administrativo Consolidado</p>
+                <p style="font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; color: #475569 !important; margin: 0 0 4px 0;">
+                    Av. 9 de Julio 1241 - Wps 3704-280259
+                </p>
+                <p style="font-size:9px;color:#94a3b8;margin:0;">TecnoWork - Reporte Administrativo Consolidado</p>
             </div>
         `;
 
