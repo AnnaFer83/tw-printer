@@ -1279,7 +1279,7 @@ body.light-mode .drop-zone-loader {
 /* Estilos de Impresión Físicos */
 @media print {
     @page {
-        margin: 10mm;
+        margin: 0;
         size: A4 portrait;
     }
 

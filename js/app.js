@@ -2558,6 +2558,11 @@ function renderReadingsTable() {
                             totalPFCurr += repCurrPF;
                             totalPFCons += consPF_nvo;
 
+                            const totalPP_ant = excessCostPP_ant;
+                            const totalPF_ant = excessCostPF_ant;
+                            const totalPP_nvo = ppCost + excessCostPP_nvo;
+                            const totalPF_nvo = pfCost + excessCostPF_nvo;
+
                             // Fila Anterior (Color)
                             detailsHtml += `
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
@@ -2566,9 +2571,9 @@ function renderReadingsTable() {
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currPP || 0)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_ant)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_ant)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(ppCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">$0</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPP_ant)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCostPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalPP_ant)}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
                                     <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);"><span style="margin-left: 20px;"></span> <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; color: var(--color-cyan);">FOTOGRAFIA</span></td>
@@ -2576,9 +2581,9 @@ function renderReadingsTable() {
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currPF || 0)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_ant)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_ant)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${pfCost > 0 ? PDFGenerator.formatCurrency(pfCost) : '-'}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">-</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPF_ant)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCostPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalPF_ant)}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
                                     <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>[Nvo] ${mr.repModel} ${mr.repSerialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.repSerialNumber})</span>` : ''} <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; margin-left: 5px; color: var(--color-cyan);">TEXTO COLOR</span></td>
@@ -2586,9 +2591,9 @@ function renderReadingsTable() {
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCurrPP)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_nvo)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_nvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">$0</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(ppCost)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPP_nvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCostPP_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalPP_nvo)}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
                                     <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><span style="margin-left: 20px;"></span> <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; color: var(--color-cyan);">FOTOGRAFIA</span></td>
@@ -2596,9 +2601,9 @@ function renderReadingsTable() {
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCurrPF)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_nvo)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_nvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">-</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${pfCost > 0 ? PDFGenerator.formatCurrency(pfCost) : '-'}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPF_nvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCostPF_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalPF_nvo)}</td>
                                 </tr>
                             `;
                         } else {
@@ -2685,9 +2690,9 @@ function renderReadingsTable() {
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currCounter)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.consumption)}</td>
                                     <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${excessAnt > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(excessAnt)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">$0</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_ant)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.planCost + excessCost_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCost_ant)}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
                                     <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>[Nvo] ${mr.repModel} ${mr.repSerialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.repSerialNumber})</span>` : ''}</td>
@@ -2695,9 +2700,9 @@ function renderReadingsTable() {
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCurr)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCons)}</td>
                                     <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: ${excessNvo > 0 ? 'var(--color-warning)' : 'var(--text-secondary)'}">${PDFGenerator.formatNumber(excessNvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">$0</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.planCost + excessCost_nvo)}</td>
                                 </tr>
                             `;
                         } else {
