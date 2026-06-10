@@ -32,7 +32,8 @@ def init_db():
             name         TEXT NOT NULL,
             copies       INTEGER NOT NULL DEFAULT 0,
             cost         REAL NOT NULL DEFAULT 0,
-            excess_price REAL
+            excess_price REAL,
+            components   TEXT NOT NULL DEFAULT '[]'
         );
 
         CREATE TABLE IF NOT EXISTS clients (
@@ -49,6 +50,7 @@ def init_db():
             serial_number       TEXT DEFAULT '',
             is_fixed            INTEGER NOT NULL DEFAULT 0,
             plan_id             TEXT,
+            plan_component_id   TEXT DEFAULT '',
             custom_cost         REAL,
             custom_excess_price REAL,
             FOREIGN KEY (client_id) REFERENCES clients(id),
@@ -111,11 +113,21 @@ def init_db():
             rep_curr_pp          REAL DEFAULT 0,
             rep_prev_pf          REAL DEFAULT 0,
             rep_curr_pf          REAL DEFAULT 0,
+            plan_component_id TEXT DEFAULT '',
             FOREIGN KEY (reading_id) REFERENCES readings(id)
         );
     """)
 
     # Ejecutar alteraciones para bases de datos SQLite locales que ya existían
+    try:
+        conn.execute("ALTER TABLE plans ADD COLUMN components TEXT NOT NULL DEFAULT '[]'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE machines ADD COLUMN plan_component_id TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+
     cols_to_add = [
         ("serial_number", "TEXT DEFAULT ''"),
         ("prev_impresiones", "REAL DEFAULT 0"),
@@ -140,6 +152,7 @@ def init_db():
         ("rep_curr_pp", "REAL DEFAULT 0"),
         ("rep_prev_pf", "REAL DEFAULT 0"),
         ("rep_curr_pf", "REAL DEFAULT 0"),
+        ("plan_component_id", "TEXT DEFAULT ''"),
     ]
     for col_name, col_type in cols_to_add:
         try:
@@ -180,15 +193,20 @@ def load_data():
         except (json.JSONDecodeError, TypeError):
             config[row["key"]] = row["value"]
 
-    # Planes (incluye excess_price)
+    # Planes (incluye excess_price, components)
     plans = []
-    for p in conn.execute("SELECT id, name, copies, cost, excess_price FROM plans"):
+    for p in conn.execute("SELECT id, name, copies, cost, excess_price, components FROM plans"):
+        try:
+            comps = json.loads(p["components"])
+        except Exception:
+            comps = []
         plans.append({
             "id":          p["id"],
             "name":        p["name"],
             "copies":      p["copies"],
             "cost":        p["cost"],
             "excessPrice": p["excess_price"],
+            "components":  comps,
         })
 
     # Clientes + máquinas embebidas
@@ -209,6 +227,7 @@ def load_data():
                 "serialNumber":     m["serial_number"] or "",
                 "isFixed":          bool(m["is_fixed"]),
                 "planId":           m["plan_id"],
+                "planComponentId":   m["plan_component_id"] or "",
                 "customCost":       m["custom_cost"],
                 "customExcessPrice": m["custom_excess_price"],
             })
@@ -276,6 +295,7 @@ def load_data():
                 "repCurrPP":          mr["rep_curr_pp"] if mr["rep_curr_pp"] is not None else 0,
                 "repPrevPF":          mr["rep_prev_pf"] if mr["rep_prev_pf"] is not None else 0,
                 "repCurrPF":          mr["rep_curr_pf"] if mr["rep_curr_pf"] is not None else 0,
+                "planComponentId":    mr["plan_component_id"] or "",
             })
         readings.append(reading)
 
@@ -299,8 +319,8 @@ def save_data(payload):
         conn.execute("DELETE FROM plans")
         for p in payload.get("plans", []):
             conn.execute(
-                "INSERT INTO plans (id, name, copies, cost, excess_price) VALUES (?, ?, ?, ?, ?)",
-                (p["id"], p["name"], p["copies"], p["cost"], p.get("excessPrice"))
+                "INSERT INTO plans (id, name, copies, cost, excess_price, components) VALUES (?, ?, ?, ?, ?, ?)",
+                (p["id"], p["name"], p["copies"], p["cost"], p.get("excessPrice"), json.dumps(p.get("components", [])))
             )
 
         # Borrar en cascada (machine_readings → readings → machines → clients)
@@ -318,13 +338,14 @@ def save_data(payload):
             for m in c.get("machines", []):
                 conn.execute(
                     """INSERT INTO machines
-                       (id, client_id, name, serial_number, is_fixed, plan_id, custom_cost, custom_excess_price)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (id, client_id, name, serial_number, is_fixed, plan_id, plan_component_id, custom_cost, custom_excess_price)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         m["id"], c["id"], m["name"],
                         m.get("serialNumber", ""),
                         1 if m.get("isFixed") else 0,
                         m.get("planId"),
+                        m.get("planComponentId", ""),
                         m.get("customCost"),
                         m.get("customExcessPrice"),
                     )
@@ -358,8 +379,8 @@ def save_data(payload):
                         prev_pp, curr_pp, prev_pf, curr_pf,
                         has_replacement, rep_model, rep_serial_number, rep_prev_counter, rep_curr_counter,
                         rep_consumption, rep_prev_impresiones, rep_curr_impresiones, rep_prev_copias,
-                        rep_curr_copias, rep_prev_pp, rep_curr_pp, rep_prev_pf, rep_curr_pf)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        rep_curr_copias, rep_prev_pp, rep_curr_pp, rep_prev_pf, rep_curr_pf, plan_component_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         r["id"],
                         mr.get("machineId", ""),
@@ -399,6 +420,7 @@ def save_data(payload):
                         mr.get("repCurrPP", 0),
                         mr.get("repPrevPF", 0),
                         mr.get("repCurrPF", 0),
+                        mr.get("planComponentId", ""),
                     )
                 )
 
@@ -475,8 +497,11 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         )
 
     def log_message(self, format, *args):
-        if "/api/" in args[0]:
-            super().log_message(format, *args)
+        try:
+            if len(args) > 0 and isinstance(args[0], str) and "/api/" in args[0]:
+                super().log_message(format, *args)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------

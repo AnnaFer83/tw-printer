@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS plans (
     name         TEXT    NOT NULL,
     copies       INTEGER NOT NULL DEFAULT 0,
     cost         NUMERIC NOT NULL DEFAULT 0,
-    excess_price NUMERIC
+    excess_price NUMERIC,
+    components   JSONB   DEFAULT '[]'::jsonb
 );
 
 -- Clientes (empresas que contratan el servicio)
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS machines (
     serial_number       TEXT    DEFAULT '',
     is_fixed            BOOLEAN NOT NULL DEFAULT FALSE,
     plan_id             TEXT    REFERENCES plans(id),
+    plan_component_id   TEXT    DEFAULT '',
     custom_cost         NUMERIC,
     custom_excess_price NUMERIC
 );
@@ -99,7 +101,8 @@ CREATE TABLE IF NOT EXISTS machine_readings (
     rep_prev_pp          NUMERIC DEFAULT 0,
     rep_curr_pp          NUMERIC DEFAULT 0,
     rep_prev_pf          NUMERIC DEFAULT 0,
-    rep_curr_pf          NUMERIC DEFAULT 0
+    rep_curr_pf          NUMERIC DEFAULT 0,
+    plan_component_id    TEXT    DEFAULT ''
 );
 
 -- Migraciones para base de datos existente (ejecutar si la tabla ya existía):
@@ -125,6 +128,9 @@ CREATE TABLE IF NOT EXISTS machine_readings (
 -- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_pp NUMERIC DEFAULT 0;
 -- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_prev_pf NUMERIC DEFAULT 0;
 -- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS rep_curr_pf NUMERIC DEFAULT 0;
+-- ALTER TABLE plans ADD COLUMN IF NOT EXISTS components JSONB DEFAULT '[]'::jsonb;
+-- ALTER TABLE machines ADD COLUMN IF NOT EXISTS plan_component_id TEXT DEFAULT '';
+-- ALTER TABLE machine_readings ADD COLUMN IF NOT EXISTS plan_component_id TEXT DEFAULT '';
 
 -- =============================================================================
 -- Acceso para la clave anon (app frontend)

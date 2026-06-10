@@ -49,12 +49,25 @@ const PDFGenerator = {
                 </tr>`;
             } else {
                 if (type === "color") {
-                    const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
-                    const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+                    let ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                    let pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+                    let ppCost = mr.planCost || 0;
+                    let pfCost = 0;
 
-                    const consPP_ant = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
-                    const consPF_ant = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
-                    const excessCost_ant = (consPP_ant * ppPrice) + (consPF_ant * pfPrice);
+                    let machine = null;
+                    if (AppState.clients) {
+                        for (const client of AppState.clients) {
+                            machine = client.machines.find(mac => mac.id === mr.machineId);
+                            if (machine) break;
+                        }
+                    }
+                    if (machine) {
+                        const rates = window.resolveColorRates(machine);
+                        ppPrice = rates.ppPrice;
+                        pfPrice = rates.pfPrice;
+                        ppCost = rates.ppCost;
+                        pfCost = rates.pfCost;
+                    }
 
                     if (hasRep) {
                         const repPrevPP = mr.repPrevPP || 0;
@@ -62,43 +75,93 @@ const PDFGenerator = {
                         const repPrevPF = mr.repPrevPF || 0;
                         const repCurrPF = mr.repCurrPF || 0;
 
+                        const consPP_ant = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
+                        const consPF_ant = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
                         const consPP_nvo = Math.max(0, repCurrPP - repPrevPP);
                         const consPF_nvo = Math.max(0, repCurrPF - repPrevPF);
-                        const excessCost_nvo = (consPP_nvo * ppPrice) + (consPF_nvo * pfPrice);
+
+                        const excessCostPP_ant = consPP_ant * ppPrice;
+                        const excessCostPF_ant = consPF_ant * pfPrice;
+                        const excessCostPP_nvo = consPP_nvo * ppPrice;
+                        const excessCostPF_nvo = consPF_nvo * pfPrice;
+
+                        const totalCostPP_ant = ppCost + excessCostPP_ant;
+                        const totalCostPF_ant = pfCost + excessCostPF_ant;
 
                         return `
                             <tr>
                                 <td style="font-weight: 700; padding: 8px 10px;">[Ant] ${mr.name}</td>
-                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
-                                <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
-                                <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.currPP} | PF:${mr.currPF}</td>
-                                <td style="text-align: right; padding: 8px 10px;">-</td>
-                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCost_ant > 0 ? '#d97706' : '#1e293b'}; font-size: 8px;">PP:${consPP_ant} | PF:${consPF_ant}</td>
-                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCost_ant)}</td>
-                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.planCost + excessCost_ant)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(ppCost)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevPP || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currPP || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">TEXTO COLOR</td>
+                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCostPP_ant > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(consPP_ant)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCostPP_ant)}</td>
+                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(totalCostPP_ant)}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700; padding: 8px 10px;"></td>
+                                <td style="text-align: right; padding: 8px 10px;">${pfCost > 0 ? this.formatNumber(pfCost) : ''}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevPF || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currPF || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">FOTOGRAFIA</td>
+                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCostPF_ant > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(consPF_ant)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCostPF_ant)}</td>
+                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(totalCostPF_ant)}</td>
                             </tr>
                             <tr style="background-color: rgba(0,0,0,0.01);">
                                 <td style="font-weight: 700; padding: 8px 10px; padding-left: 15px;">[Nvo] ${mr.repModel}</td>
                                 <td style="text-align: right; padding: 8px 10px;">0</td>
-                                <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${repPrevPP} | PF:${repPrevPF}</td>
-                                <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${repCurrPP} | PF:${repCurrPF}</td>
-                                <td style="text-align: right; padding: 8px 10px;">-</td>
-                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCost_nvo > 0 ? '#d97706' : '#1e293b'}; font-size: 8px;">PP:${consPP_nvo} | PF:${consPF_nvo}</td>
-                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCost_nvo)}</td>
-                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(excessCost_nvo)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(repPrevPP)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(repCurrPP)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">TEXTO COLOR</td>
+                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCostPP_nvo > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(consPP_nvo)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCostPP_nvo)}</td>
+                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(excessCostPP_nvo)}</td>
+                            </tr>
+                            <tr style="background-color: rgba(0,0,0,0.01);">
+                                <td style="font-weight: 700; padding: 8px 10px; padding-left: 15px;"></td>
+                                <td style="text-align: right; padding: 8px 10px;"></td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(repPrevPF)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(repCurrPF)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">FOTOGRAFIA</td>
+                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCostPF_nvo > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(consPF_nvo)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCostPF_nvo)}</td>
+                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(excessCostPF_nvo)}</td>
                             </tr>
                         `;
                     } else {
-                        return `<tr>
-                            <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.planCost)}</td>
-                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
-                            <td style="text-align: right; padding: 8px 10px; font-size: 8px;" class="pdf-cell-yellow">PP:${mr.currPP} | PF:${mr.currPF}</td>
-                            <td style="text-align: right; padding: 8px 10px;">-</td>
-                            <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${mr.excessCost > 0 ? '#d97706' : '#1e293b'}; font-size: 8px;">PP:${consPP_ant} | PF:${consPF_ant}</td>
-                            <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(mr.excessCost)}</td>
-                            <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(mr.totalCost)}</td>
-                        </tr>`;
+                        const consPP = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
+                        const consPF = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
+
+                        const excessCostPP = consPP * ppPrice;
+                        const excessCostPF = consPF * pfPrice;
+
+                        const totalCostPP = ppCost + excessCostPP;
+                        const totalCostPF = pfCost + excessCostPF;
+
+                        return `
+                            <tr>
+                                <td style="font-weight: 700; padding: 8px 10px;">${mr.name}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(ppCost)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevPP || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currPP || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">TEXTO COLOR</td>
+                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCostPP > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(consPP)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCostPP)}</td>
+                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(totalCostPP)}</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 700; padding: 8px 10px;"></td>
+                                <td style="text-align: right; padding: 8px 10px;">${pfCost > 0 ? this.formatNumber(pfCost) : ''}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.prevPF || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;" class="pdf-cell-yellow">${this.formatNumber(mr.currPF || 0)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">FOTOGRAFIA</td>
+                                <td style="text-align: right; padding: 8px 10px; font-weight: 700; color: ${excessCostPF > 0 ? '#d97706' : '#1e293b'}">${this.formatNumber(consPF)}</td>
+                                <td style="text-align: right; padding: 8px 10px;">${this.formatNumber(excessCostPF)}</td>
+                                <td style="text-align: right; font-weight: 700; padding: 8px 10px;">${this.formatNumber(totalCostPF)}</td>
+                            </tr>
+                        `;
                     }
                 } else {
                     const excessPrice = mr.excessPrice;
@@ -159,7 +222,7 @@ const PDFGenerator = {
                 }
             }
         }).join('');
-    }
+    },
 
     /**
      * Genera el PDF individual de un cliente via window.print().

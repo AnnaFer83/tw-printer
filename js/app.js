@@ -331,6 +331,63 @@ async function initApp() {
             }
         });
     }
+    // Garantizar que todos los planes tengan la estructura jerárquica de componentes
+    if (AppState.plans) {
+        AppState.plans.forEach(p => {
+            if (!p.components || p.components.length === 0) {
+                p.components = [
+                    {
+                        id: "comp-" + p.id + "-default",
+                        name: p.name || "B/N con copias",
+                        type: "bn",
+                        copies: p.copies !== undefined ? p.copies : 0,
+                        cost: p.cost !== undefined ? p.cost : 0,
+                        excessPrice: p.excessPrice !== undefined ? p.excessPrice : 90
+                    }
+                ];
+                dataModified = true;
+                console.log(`Plan migrado a estructura jerárquica: ${p.name}`);
+            }
+        });
+    }
+
+    // Garantizar que todas las máquinas de clientes tengan un planComponentId válido si tienen planId
+    if (AppState.clients) {
+        AppState.clients.forEach(c => {
+            if (c.machines) {
+                c.machines.forEach(m => {
+                    if (m.planId && !m.planComponentId) {
+                        const plan = AppState.plans.find(p => p.id === m.planId);
+                        if (plan && plan.components && plan.components.length > 0) {
+                            m.planComponentId = plan.components[0].id;
+                            dataModified = true;
+                            console.log(`Máquina ${m.name} del cliente ${c.name} vinculada al componente por defecto del plan ${plan.name}`);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    // Garantizar que todos los registros de lectura de máquina tengan planComponentId si tienen planId
+    if (AppState.readings) {
+        AppState.readings.forEach(r => {
+            if (r.machineReadings) {
+                r.machineReadings.forEach(mr => {
+                    if (!mr.planComponentId && mr.machineId) {
+                        const clientObj = AppState.clients.find(c => c.id === r.clientId);
+                        if (clientObj) {
+                            const m = clientObj.machines.find(mac => mac.id === mr.machineId);
+                            if (m && m.planComponentId) {
+                                mr.planComponentId = m.planComponentId;
+                                dataModified = true;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    }
 
     if (dataModified || !dataLoadedFromServer) {
         syncWithServer();
@@ -365,6 +422,28 @@ function setupEventListeners() {
     });
 
     // 3. Toggles de Campos de Máquinas en Ficha de Clientes
+    const mPlanSelect = document.getElementById("machine-plan");
+    if (mPlanSelect) {
+        mPlanSelect.addEventListener("change", () => {
+            const planId = mPlanSelect.value;
+            const compSelect = document.getElementById("machine-plan-component");
+            if (compSelect) {
+                compSelect.innerHTML = '<option value="" disabled selected>Seleccione un componente...</option>';
+                if (planId) {
+                    const plan = AppState.plans.find(p => p.id === planId);
+                    if (plan && plan.components) {
+                        plan.components.forEach(c => {
+                            compSelect.innerHTML += `<option value="${c.id}">${c.name} (${c.type})</option>`;
+                        });
+                        if (plan.components.length > 0) {
+                            compSelect.selectedIndex = 1; // default to first component
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     const checkFixed = document.getElementById("machine-is-fixed");
     checkFixed.addEventListener("change", () => {
         const planFields = document.getElementById("machine-plan-fields-box");
@@ -406,6 +485,7 @@ function setupEventListeners() {
             newMachine.customExcessPrice = 0;
         } else {
             const planId = document.getElementById("machine-plan").value;
+            const planComponentId = document.getElementById("machine-plan-component").value;
             const costOverride = document.getElementById("machine-custom-cost").value;
             const excessOverride = document.getElementById("machine-custom-excess").value;
 
@@ -413,8 +493,13 @@ function setupEventListeners() {
                 showToast("Por favor selecciona un plan para la máquina.", "error");
                 return;
             }
+            if (!planComponentId) {
+                showToast("Por favor selecciona un componente del plan.", "error");
+                return;
+            }
 
             newMachine.planId = planId;
+            newMachine.planComponentId = planComponentId;
             newMachine.customCost = costOverride !== "" ? parseFloat(costOverride) : null;
             newMachine.customExcessPrice = excessOverride !== "" ? parseFloat(excessOverride) : null;
         }
@@ -429,6 +514,7 @@ function setupEventListeners() {
         document.getElementById("machine-custom-cost").value = "";
         document.getElementById("machine-custom-excess").value = "";
         document.getElementById("machine-plan").selectedIndex = 0;
+        document.getElementById("machine-plan-component").innerHTML = '<option value="" disabled selected>Seleccione un componente...</option>';
         checkFixed.checked = false;
         document.getElementById("machine-plan-fields-box").classList.remove("hidden");
         document.getElementById("machine-fixed-fields-box").classList.add("hidden");
@@ -539,9 +625,27 @@ function setupEventListeners() {
         clientObj.machines.forEach(m => {
             if (validationError) return;
 
-            if (m.isFixed) {
-                // Concepto fijo
-                const readingCost = m.customCost || 0;
+            let isColor = getMachineType(m.name) === "color";
+            let isEcografo = false;
+            let isOther = false;
+            if (!m.isFixed && m.planId) {
+                const plan = AppState.plans.find(p => p.id === m.planId);
+                if (plan && plan.components) {
+                    const comp = plan.components.find(c => c.id === m.planComponentId);
+                    if (comp) {
+                        if (comp.type === "ecografo") isEcografo = true;
+                        if (comp.type === "other") isOther = true;
+                    }
+                }
+            }
+
+            if (m.isFixed || isOther) {
+                let readingCost = 0;
+                if (m.isFixed) {
+                    readingCost = m.customCost || 0;
+                } else {
+                    readingCost = resolveOtherRates(m).cost;
+                }
                 machineReadings.push({
                     machineId: m.id,
                     name: m.name,
@@ -557,6 +661,7 @@ function setupEventListeners() {
                     totalCost: readingCost,
                     isFixed: true,
                     isPending: false,
+                    planComponentId: m.planComponentId || "",
 
                     // Sub-contadores y reemplazo inicializados a cero/vacíos
                     prevImpresiones: 0, currImpresiones: 0,
@@ -574,11 +679,6 @@ function setupEventListeners() {
                 totalAbono += readingCost;
                 totalGeneral += readingCost;
             } else {
-                const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
-                const planCopies = plan.copies;
-                const planCost = m.customCost !== null ? m.customCost : plan.cost;
-                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
-                const type = getMachineType(m.name);
                 const hasRep = document.getElementById(`has-replacement-${m.id}`)?.checked || false;
 
                 let isPending = false;
@@ -596,7 +696,14 @@ function setupEventListeners() {
                 let repPrevPP = 0, repCurrPP = 0;
                 let repPrevPF = 0, repCurrPF = 0;
 
-                if (type === "color") {
+                let planCopies = 0;
+                let planCost = 0;
+                let excessPrice = 0;
+
+                if (isColor) {
+                    const rates = resolveColorRates(m);
+                    planCost = rates.ppCost + rates.pfCost;
+
                     const prevPPInput = document.getElementById(`prev-pp-${m.id}`);
                     const currPPInput = document.getElementById(`curr-pp-${m.id}`);
                     const prevPFInput = document.getElementById(`prev-pf-${m.id}`);
@@ -675,8 +782,67 @@ function setupEventListeners() {
                             repCurr = repCurrPP + repCurrPF;
                         }
                     }
+                } else if (isEcografo) {
+                    const rates = resolveEcografoRates(m);
+                    planCost = rates.cost;
+                    excessPrice = rates.pagePrice;
+
+                    const prevInput = document.getElementById(`prev-${m.id}`);
+                    const currInput = document.getElementById(`curr-${m.id}`);
+
+                    const prevVal = prevInput ? prevInput.value.trim() : "";
+                    const currVal = currInput ? currInput.value.trim() : "";
+
+                    isPending = prevVal === "" || currVal === "";
+
+                    if (!isPending) {
+                        prev = parseInt(prevVal) || 0;
+                        curr = parseInt(currVal) || 0;
+
+                        if (curr < prev) {
+                            showToast(`El contador actual de ${m.name} es menor al anterior.`, "error");
+                            currInput.focus();
+                            validationError = true;
+                            return;
+                        }
+                    }
+
+                    if (hasRep) {
+                        const repModelVal = document.getElementById(`rep-model-${m.id}`)?.value.trim() || "";
+                        const repSerialVal = document.getElementById(`rep-serial-${m.id}`)?.value.trim() || "";
+                        const repPrevVal = document.getElementById(`rep-prev-${m.id}`)?.value.trim() || "";
+                        const repCurrVal = document.getElementById(`rep-curr-${m.id}`)?.value.trim() || "";
+
+                        if (repModelVal === "" || repSerialVal === "") {
+                            showToast(`Complete el Modelo y S/N nuevo para ${m.name}.`, "error");
+                            document.getElementById(`rep-model-${m.id}`).focus();
+                            validationError = true;
+                            return;
+                        }
+
+                        if (repPrevVal === "" || repCurrVal === "") {
+                            isPending = true;
+                        } else {
+                            repModel = repModelVal;
+                            repSerial = repSerialVal;
+                            repPrev = parseInt(repPrevVal) || 0;
+                            repCurr = parseInt(repCurrVal) || 0;
+
+                            if (repCurr < repPrev) {
+                                showToast(`El contador actual del equipo nuevo es menor al inicial.`, "error");
+                                document.getElementById(`rep-curr-${m.id}`).focus();
+                                validationError = true;
+                                return;
+                            }
+                        }
+                    }
                 } else {
                     // Laser
+                    const rates = resolveBNRates(m);
+                    planCost = rates.cost;
+                    planCopies = rates.copies;
+                    excessPrice = rates.excessPrice;
+
                     const prevInput = document.getElementById(`prev-${m.id}`);
                     const currInput = document.getElementById(`curr-${m.id}`);
 
@@ -752,10 +918,8 @@ function setupEventListeners() {
                         repConsumption = Math.max(0, repCurr - repPrev);
                     }
 
-                    if (type === "color") {
-                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
-                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
-
+                    if (isColor) {
+                        const rates = resolveColorRates(m);
                         let consPP = Math.max(0, currPP - prevPP);
                         let consPF = Math.max(0, currPF - prevPF);
                         if (hasRep) {
@@ -763,30 +927,37 @@ function setupEventListeners() {
                             consPF += Math.max(0, repCurrPF - repPrevPF);
                         }
 
-                        excessCost = (consPP * ppPrice) + (consPF * pfPrice);
+                        excessCost = (consPP * rates.ppPrice) + (consPF * rates.pfPrice);
                         excess = consumption + repConsumption;
+                        totalCost = planCost + excessCost;
+                    } else if (isEcografo) {
+                        const rates = resolveEcografoRates(m);
+                        const totalCons = consumption + repConsumption;
+                        excess = totalCons;
+                        excessCost = totalCons * rates.pagePrice;
                         totalCost = planCost + excessCost;
                     } else {
                         // Laser
-                        if (planCopies === 0) {
+                        const rates = resolveBNRates(m);
+                        if (rates.copies === 0) {
                             let totalCons = consumption;
                             if (hasRep) {
                                 totalCons += repConsumption;
                             }
                             excess = totalCons;
-                            excessCost = totalCons * excessPrice;
+                            excessCost = totalCons * rates.excessPrice;
                             totalCost = planCost + excessCost;
                         } else {
                             if (hasRep) {
-                                const excessAnt = Math.max(0, consumption - planCopies);
-                                const remainingPlan = Math.max(0, planCopies - consumption);
+                                const excessAnt = Math.max(0, consumption - rates.copies);
+                                const remainingPlan = Math.max(0, rates.copies - consumption);
                                 const excessNvo = Math.max(0, repConsumption - remainingPlan);
 
                                 excess = excessAnt + excessNvo;
                             } else {
-                                excess = Math.max(0, consumption - planCopies);
+                                excess = Math.max(0, consumption - rates.copies);
                             }
-                            excessCost = excess * excessPrice;
+                            excessCost = excess * rates.excessPrice;
                             totalCost = planCost + excessCost;
                         }
                     }
@@ -807,6 +978,7 @@ function setupEventListeners() {
                     totalCost: totalCost,
                     isFixed: false,
                     isPending: isPending,
+                    planComponentId: m.planComponentId || "",
 
                     // Sub-contadores
                     prevImpresiones: prevImp, currImpresiones: currImp,
@@ -879,12 +1051,34 @@ function setupEventListeners() {
     });
 
     // 6. Configuración de Planes Habituales: Crear/Editar Plan
+    const btnAddCompTemp = document.getElementById("btn-add-comp-temp");
+    if (btnAddCompTemp) {
+        btnAddCompTemp.addEventListener("click", () => {
+            window.addPlanComponentTemp();
+        });
+    }
+
     document.getElementById("form-add-plan").addEventListener("submit", (e) => {
         e.preventDefault();
         const name = document.getElementById("new-plan-name").value.trim();
-        const copies = parseInt(document.getElementById("new-plan-copies").value);
-        const cost = parseFloat(document.getElementById("new-plan-cost").value);
-        const excessPrice = parseFloat(document.getElementById("new-plan-excess").value) || AppState.config.defaultExcessPrice;
+        
+        if (!AppState.tempPlanComponents || AppState.tempPlanComponents.length === 0) {
+            showToast("Debes agregar al menos un componente al plan.", "error");
+            return;
+        }
+
+        // Calcular valores del plan principal para mantener compatibilidad
+        let copies = 0;
+        let cost = 0;
+        let excessPrice = AppState.config.defaultExcessPrice || 90;
+
+        AppState.tempPlanComponents.forEach(c => {
+            cost += c.cost;
+            if (c.type === "bn") {
+                copies += c.copies;
+                excessPrice = c.excessPrice;
+            }
+        });
 
         if (AppState.editingPlanId) {
             // Edición
@@ -894,6 +1088,7 @@ function setupEventListeners() {
                 AppState.plans[planIdx].copies = copies;
                 AppState.plans[planIdx].cost = cost;
                 AppState.plans[planIdx].excessPrice = excessPrice;
+                AppState.plans[planIdx].components = JSON.parse(JSON.stringify(AppState.tempPlanComponents));
                 showToast(`Plan "${name}" actualizado.`);
             }
             AppState.editingPlanId = null;
@@ -907,11 +1102,15 @@ function setupEventListeners() {
                 name: name,
                 copies: copies,
                 cost: cost,
-                excessPrice: excessPrice
+                excessPrice: excessPrice,
+                components: JSON.parse(JSON.stringify(AppState.tempPlanComponents))
             };
             AppState.plans.push(newPlan);
             showToast(`Plan "${name}" creado exitosamente.`);
         }
+
+        AppState.tempPlanComponents = [];
+        window.renderTempComponentsTable();
 
         savePlansToStorage();
         renderConfigPlansTable();
@@ -927,6 +1126,8 @@ function setupEventListeners() {
     // Cancelar Edición de Plan
     document.getElementById("btn-cancel-plan-edit").addEventListener("click", () => {
         AppState.editingPlanId = null;
+        AppState.tempPlanComponents = [];
+        window.renderTempComponentsTable();
         document.getElementById("form-add-plan").reset();
         document.getElementById("plan-form-title").innerHTML = '<i class="fa-solid fa-folder-plus"></i> Agregar Nuevo Plan';
         document.getElementById("btn-submit-plan").innerHTML = '<i class="fa-solid fa-plus"></i> Crear Plan';
@@ -1365,23 +1566,51 @@ function setupMultiMachineInputSheet(clientObj) {
             }
         }
 
-        if (m.isFixed) {
+        let isColor = getMachineType(m.name) === "color";
+        let isEcografo = false;
+        let isOther = false;
+        if (!m.isFixed && m.planId) {
+            const plan = AppState.plans.find(p => p.id === m.planId);
+            if (plan && plan.components) {
+                const comp = plan.components.find(c => c.id === m.planComponentId);
+                if (comp) {
+                    if (comp.type === "ecografo") isEcografo = true;
+                    if (comp.type === "other") isOther = true;
+                }
+            }
+        }
+
+        if (m.isFixed || isOther) {
             const tr = document.createElement("tr");
+            let abono = 0;
+            if (m.isFixed) {
+                abono = m.customCost || 0;
+            } else {
+                abono = resolveOtherRates(m).cost;
+            }
             tr.innerHTML = `
                 <td>
                     <div style="font-weight:600;">${m.name}</div>
                     <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
                 </td>
                 <td colspan="2" class="text-center text-muted" style="font-size:0.75rem;">Fijo (Sin contadores)</td>
-                <td class="text-right font-weight-bold" style="padding-right: 5px;">${PDFGenerator.formatCurrency(m.customCost)}</td>
+                <td class="text-right font-weight-bold" style="padding-right: 5px; vertical-align: middle;">${PDFGenerator.formatCurrency(abono)}</td>
             `;
             tbody.appendChild(tr);
         } else {
-            const plan = AppState.plans.find(p => p.id === m.planId) || { name: "Plan", cost: 0 };
-            const abono = m.customCost !== null ? m.customCost : plan.cost;
-            const type = getMachineType(m.name);
+            let abono = 0;
+            if (isColor) {
+                const rates = resolveColorRates(m);
+                abono = rates.ppCost + rates.pfCost;
+            } else if (isEcografo) {
+                const rates = resolveEcografoRates(m);
+                abono = rates.cost;
+            } else {
+                const rates = resolveBNRates(m);
+                abono = rates.cost;
+            }
 
-            if (type === "color") {
+            if (isColor) {
                 // Fila principal PP
                 const trPP = document.createElement("tr");
                 trPP.className = "main-machine-row";
@@ -1423,9 +1652,31 @@ function setupMultiMachineInputSheet(clientObj) {
                     <td></td>
                 `;
                 tbody.appendChild(trPF);
+            } else if (isEcografo) {
+                // Ecógrafo: fila principal Contador
+                const trCont = document.createElement("tr");
+                trCont.className = "main-machine-row";
+                trCont.innerHTML = `
+                    <td>
+                        <div style="font-weight:600;">${m.name} (Ecógrafo)</div>
+                        <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
+                        <label style="font-size:0.75rem; margin-top:5px; display:inline-block; cursor:pointer; color: var(--color-cyan);">
+                            <input type="checkbox" id="has-replacement-${m.id}" onchange="toggleReplacementRow('${m.id}')" ${hasRepChecked}> Hubo cambio de equipo
+                        </label>
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Contador Anterior:</span>
+                        <input type="number" id="prev-${m.id}" value="${prevVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td>
+                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">Contador Actual:</span>
+                        <input type="number" id="curr-${m.id}" value="${currVal}" min="0" oninput="recalcMultiSheetPreview()">
+                    </td>
+                    <td class="text-right" id="total-preview-${m.id}" style="font-weight:600; padding-right: 5px; vertical-align: middle;">${PDFGenerator.formatCurrency(abono)}</td>
+                `;
+                tbody.appendChild(trCont);
             } else {
-                // Laser
-                // Fila principal Contador
+                // Laser / B/N con copias
                 const trCont = document.createElement("tr");
                 trCont.className = "main-machine-row";
                 trCont.innerHTML = `
@@ -1495,7 +1746,7 @@ function setupMultiMachineInputSheet(clientObj) {
             trRep.style.borderLeft = "4px solid var(--color-cyan)";
             
             let repInputsHtml = "";
-            if (type === "color") {
+            if (isColor) {
                 repInputsHtml = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                         <div>
@@ -1513,6 +1764,19 @@ function setupMultiMachineInputSheet(clientObj) {
                         <div>
                             <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PF Final</label>
                             <input type="number" id="rep-curr-pf-${m.id}" value="${repCurrPFVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                    </div>
+                `;
+            } else if (isEcografo) {
+                repInputsHtml = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Contador Inicial</label>
+                            <input type="number" id="rep-prev-${m.id}" value="${repPrevVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; display:block; color:var(--text-muted);">Contador Final</label>
+                            <input type="number" id="rep-curr-${m.id}" value="${repCurrVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
                         </div>
                     </div>
                 `;
@@ -1615,18 +1879,36 @@ window.recalcMultiSheetPreview = function() {
     let hasPending = false;
 
     clientObj.machines.forEach(m => {
-        if (m.isFixed) {
-            grandTotal += m.customCost || 0;
-        } else {
-            const plan = AppState.plans.find(p => p.id === m.planId) || { cost: 0, copies: 0 };
-            const planCost = m.customCost !== null ? m.customCost : plan.cost;
-            const planCopies = plan.copies;
-            const type = getMachineType(m.name);
-            const hasRep = document.getElementById(`has-replacement-${m.id}`)?.checked || false;
+        let isColor = getMachineType(m.name) === "color";
+        let isEcografo = false;
+        let isOther = false;
+        if (!m.isFixed && m.planId) {
+            const plan = AppState.plans.find(p => p.id === m.planId);
+            if (plan && plan.components) {
+                const comp = plan.components.find(c => c.id === m.planComponentId);
+                if (comp) {
+                    if (comp.type === "ecografo") isEcografo = true;
+                    if (comp.type === "other") isOther = true;
+                }
+            }
+        }
 
+        if (m.isFixed || isOther) {
+            let abono = 0;
+            if (m.isFixed) {
+                abono = m.customCost || 0;
+            } else {
+                abono = resolveOtherRates(m).cost;
+            }
+            grandTotal += abono;
+        } else {
+            const hasRep = document.getElementById(`has-replacement-${m.id}`)?.checked || false;
             let isMachinePending = false;
 
-            if (type === "color") {
+            if (isColor) {
+                const rates = resolveColorRates(m);
+                const planCost = rates.ppCost + rates.pfCost;
+
                 const prevPPVal = document.getElementById(`prev-pp-${m.id}`)?.value.trim() || "";
                 const currPPVal = document.getElementById(`curr-pp-${m.id}`)?.value.trim() || "";
                 const prevPFVal = document.getElementById(`prev-pf-${m.id}`)?.value.trim() || "";
@@ -1670,15 +1952,12 @@ window.recalcMultiSheetPreview = function() {
                         consPF += Math.max(0, repCurrPF - repPrevPF);
                     }
 
-                    const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
-                    const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
-
-                    const total = planCost + (consPP * ppPrice) + (consPF * pfPrice);
+                    const total = planCost + (consPP * rates.ppPrice) + (consPF * rates.pfPrice);
                     grandTotal += total;
                     document.getElementById(`total-preview-${m.id}`).innerText = PDFGenerator.formatCurrency(total);
                 }
-            } else {
-                // Laser / BN
+            } else if (isEcografo) {
+                const rates = resolveEcografoRates(m);
                 const prevVal = document.getElementById(`prev-${m.id}`)?.value.trim() || "";
                 const currVal = document.getElementById(`curr-${m.id}`)?.value.trim() || "";
 
@@ -1698,23 +1977,60 @@ window.recalcMultiSheetPreview = function() {
                 if (isMachinePending) {
                     hasPending = true;
                     document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
-                    grandTotal += planCost;
+                    grandTotal += rates.cost;
                 } else {
                     const prev = parseInt(prevVal) || 0;
                     const curr = parseInt(currVal) || 0;
-                    const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+
+                    let consumption = Math.max(0, curr - prev);
+                    if (hasRep) {
+                        const repPrev = parseInt(document.getElementById(`rep-prev-${m.id}`).value) || 0;
+                        const repCurr = parseInt(document.getElementById(`rep-curr-${m.id}`).value) || 0;
+                        consumption += Math.max(0, repCurr - repPrev);
+                    }
+
+                    const total = rates.cost + (consumption * rates.pagePrice);
+                    grandTotal += total;
+                    document.getElementById(`total-preview-${m.id}`).innerText = PDFGenerator.formatCurrency(total);
+                }
+            } else {
+                // Laser / BN
+                const rates = resolveBNRates(m);
+                const prevVal = document.getElementById(`prev-${m.id}`)?.value.trim() || "";
+                const currVal = document.getElementById(`curr-${m.id}`)?.value.trim() || "";
+
+                if (prevVal === "" || currVal === "") {
+                    isMachinePending = true;
+                }
+
+                if (hasRep) {
+                    const repPrevVal = document.getElementById(`rep-prev-${m.id}`)?.value.trim() || "";
+                    const repCurrVal = document.getElementById(`rep-curr-${m.id}`)?.value.trim() || "";
+
+                    if (repPrevVal === "" || repCurrVal === "") {
+                        isMachinePending = true;
+                    }
+                }
+
+                if (isMachinePending) {
+                    hasPending = true;
+                    document.getElementById(`total-preview-${m.id}`).innerText = "Pendiente";
+                    grandTotal += rates.cost;
+                } else {
+                    const prev = parseInt(prevVal) || 0;
+                    const curr = parseInt(currVal) || 0;
 
                     const consumption = Math.max(0, curr - prev);
                     let total = 0;
 
-                    if (planCopies === 0) {
+                    if (rates.copies === 0) {
                         let totalCons = consumption;
                         if (hasRep) {
                             const repPrev = parseInt(document.getElementById(`rep-prev-${m.id}`).value) || 0;
                             const repCurr = parseInt(document.getElementById(`rep-curr-${m.id}`).value) || 0;
                             totalCons += Math.max(0, repCurr - repPrev);
                         }
-                        total = planCost + (totalCons * excessPrice);
+                        total = rates.cost + (totalCons * rates.excessPrice);
                     } else {
                         let excess = 0;
                         if (hasRep) {
@@ -1722,15 +2038,15 @@ window.recalcMultiSheetPreview = function() {
                             const repCurr = parseInt(document.getElementById(`rep-curr-${m.id}`).value) || 0;
                             const repConsumption = Math.max(0, repCurr - repPrev);
 
-                            const excessAnt = Math.max(0, consumption - planCopies);
-                            const remainingPlan = Math.max(0, planCopies - consumption);
+                            const excessAnt = Math.max(0, consumption - rates.copies);
+                            const remainingPlan = Math.max(0, rates.copies - consumption);
                             const excessNvo = Math.max(0, repConsumption - remainingPlan);
 
                             excess = excessAnt + excessNvo;
                         } else {
-                            excess = Math.max(0, consumption - planCopies);
+                            excess = Math.max(0, consumption - rates.copies);
                         }
-                        total = planCost + (excess * excessPrice);
+                        total = rates.cost + (excess * rates.excessPrice);
                     }
 
                     grandTotal += total;
@@ -1761,18 +2077,53 @@ function recalculateAllReadings() {
             const m = clientObj.machines.find(mac => mac.id === mr.machineId);
             if (!m) return;
 
-            if (m.isFixed) {
-                mr.planCost = m.customCost || 0;
-                mr.totalCost = m.customCost || 0;
+            let isColor = getMachineType(m.name) === "color";
+            let isEcografo = false;
+            let isOther = false;
+            if (!m.isFixed && m.planId) {
+                const plan = AppState.plans.find(p => p.id === m.planId);
+                if (plan && plan.components) {
+                    const comp = plan.components.find(c => c.id === m.planComponentId);
+                    if (comp) {
+                        if (comp.type === "ecografo") isEcografo = true;
+                        if (comp.type === "other") isOther = true;
+                    }
+                }
+            }
+
+            if (m.isFixed || isOther) {
+                if (m.isFixed) {
+                    mr.planCost = m.customCost || 0;
+                } else {
+                    mr.planCost = resolveOtherRates(m).cost;
+                }
+                mr.totalCost = mr.planCost;
+                mr.excessCost = 0;
                 totalAbono += mr.planCost;
                 totalGeneral += mr.totalCost;
             } else {
-                const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
-                mr.planCopies = plan.copies;
-                mr.planCost = m.customCost !== null ? m.customCost : plan.cost;
-                mr.excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+                let planCopies = 0;
+                let planCost = 0;
+                let excessPrice = 0;
 
-                const type = getMachineType(m.name);
+                if (isColor) {
+                    const rates = resolveColorRates(m);
+                    planCost = rates.ppCost + rates.pfCost;
+                } else if (isEcografo) {
+                    const rates = resolveEcografoRates(m);
+                    planCost = rates.cost;
+                    excessPrice = rates.pagePrice;
+                } else {
+                    const rates = resolveBNRates(m);
+                    planCost = rates.cost;
+                    planCopies = rates.copies;
+                    excessPrice = rates.excessPrice;
+                }
+
+                mr.planCopies = planCopies;
+                mr.planCost = planCost;
+                mr.excessPrice = excessPrice;
+
                 const hasRep = mr.hasReplacement || false;
 
                 if (mr.isPending) {
@@ -1788,10 +2139,8 @@ function recalculateAllReadings() {
                         mr.repConsumption = 0;
                     }
 
-                    if (type === "color") {
-                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
-                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
-
+                    if (isColor) {
+                        const rates = resolveColorRates(m);
                         let consPP = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
                         let consPF = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
 
@@ -1800,30 +2149,37 @@ function recalculateAllReadings() {
                             consPF += Math.max(0, (mr.repCurrPF || 0) - (mr.repPrevPF || 0));
                         }
 
-                        mr.excessCost = (consPP * ppPrice) + (consPF * pfPrice);
+                        mr.excessCost = (consPP * rates.ppPrice) + (consPF * rates.pfPrice);
                         mr.excess = mr.consumption + mr.repConsumption;
+                        mr.totalCost = mr.planCost + mr.excessCost;
+                    } else if (isEcografo) {
+                        const rates = resolveEcografoRates(m);
+                        const totalCons = mr.consumption + mr.repConsumption;
+                        mr.excess = totalCons;
+                        mr.excessCost = totalCons * rates.pagePrice;
                         mr.totalCost = mr.planCost + mr.excessCost;
                     } else {
                         // Laser / BN
-                        if (mr.planCopies === 0) {
+                        const rates = resolveBNRates(m);
+                        if (rates.copies === 0) {
                             let totalCons = mr.consumption;
                             if (hasRep) {
                                 totalCons += mr.repConsumption;
                             }
                             mr.excess = totalCons;
-                            mr.excessCost = totalCons * mr.excessPrice;
+                            mr.excessCost = totalCons * rates.excessPrice;
                             mr.totalCost = mr.planCost + mr.excessCost;
                         } else {
                             if (hasRep) {
-                                const excessAnt = Math.max(0, mr.consumption - mr.planCopies);
-                                const remainingPlan = Math.max(0, mr.planCopies - mr.consumption);
+                                const excessAnt = Math.max(0, mr.consumption - rates.copies);
+                                const remainingPlan = Math.max(0, rates.copies - mr.consumption);
                                 const excessNvo = Math.max(0, mr.repConsumption - remainingPlan);
 
                                 mr.excess = excessAnt + excessNvo;
                             } else {
-                                mr.excess = Math.max(0, mr.consumption - mr.planCopies);
+                                mr.excess = Math.max(0, mr.consumption - rates.copies);
                             }
-                            mr.excessCost = mr.excess * mr.excessPrice;
+                            mr.excessCost = mr.excess * rates.excessPrice;
                             mr.totalCost = mr.planCost + mr.excessCost;
                         }
                     }
@@ -2151,12 +2507,28 @@ function renderReadingsTable() {
                 } else {
                     if (type === "color") {
                         hasSub = true;
-                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
-                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+                        let ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+                        let pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+                        let ppCost = mr.planCost || 0;
+                        let pfCost = 0;
+
+                        const m = c.machines.find(mac => mac.id === mr.machineId);
+                        if (m) {
+                            const rates = window.resolveColorRates(m);
+                            ppPrice = rates.ppPrice;
+                            pfPrice = rates.pfPrice;
+                            ppCost = rates.ppCost;
+                            pfCost = rates.pfCost;
+                        }
 
                         const consPP_ant = Math.max(0, (mr.currPP || 0) - (mr.prevPP || 0));
                         const consPF_ant = Math.max(0, (mr.currPF || 0) - (mr.prevPF || 0));
-                        const excessCost_ant = (consPP_ant * ppPrice) + (consPF_ant * pfPrice);
+
+                        const excessCostPP_ant = consPP_ant * ppPrice;
+                        const excessCostPF_ant = consPF_ant * pfPrice;
+
+                        const totalCostPP_ant = ppCost + excessCostPP_ant;
+                        const totalCostPF_ant = pfCost + excessCostPF_ant;
 
                         totalPPPrev += mr.prevPP || 0;
                         totalPPCurr += mr.currPP || 0;
@@ -2174,7 +2546,9 @@ function renderReadingsTable() {
 
                             const consPP_nvo = Math.max(0, repCurrPP - repPrevPP);
                             const consPF_nvo = Math.max(0, repCurrPF - repPrevPF);
-                            const excessCost_nvo = (consPP_nvo * ppPrice) + (consPF_nvo * pfPrice);
+
+                            const excessCostPP_nvo = consPP_nvo * ppPrice;
+                            const excessCostPF_nvo = consPF_nvo * pfPrice;
 
                             totalPPPrev += repPrevPP;
                             totalPPCurr += repCurrPP;
@@ -2187,38 +2561,68 @@ function renderReadingsTable() {
                             // Fila Anterior (Color)
                             detailsHtml += `
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
-                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">[Ant] ${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.currPP} | PF:${mr.currPF}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_ant)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.planCost + excessCost_ant)}</td>
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">[Ant] ${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''} <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; margin-left: 5px; color: var(--color-cyan);">TEXTO COLOR</span></td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevPP || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currPP || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(ppCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCostPP_ant)}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);"><span style="margin-left: 20px;"></span> <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; color: var(--color-cyan);">FOTOGRAFIA</span></td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevPF || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currPF || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${pfCost > 0 ? PDFGenerator.formatCurrency(pfCost) : '-'}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCostPF_ant)}</td>
                                 </tr>
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
-                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>[Nvo] ${mr.repModel} ${mr.repSerialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.repSerialNumber})</span>` : ''}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${repPrevPP} | PF:${repPrevPF}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${repCurrPP} | PF:${repCurrPF}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_nvo} | PF:${consPF_nvo}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_nvo} | PF:${consPF_nvo}</td>
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>[Nvo] ${mr.repModel} ${mr.repSerialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.repSerialNumber})</span>` : ''} <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; margin-left: 5px; color: var(--color-cyan);">TEXTO COLOR</span></td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repPrevPP)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCurrPP)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_nvo)}</td>
                                     <td style="text-align: right; padding: 8px 10px;">$0</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCost_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPP_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCostPP_nvo)}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background-color: rgba(255,255,255,0.01);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--color-cyan); padding-left: 20px;"><span style="margin-left: 20px;"></span> <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; color: var(--color-cyan);">FOTOGRAFIA</span></td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repPrevPF)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(repCurrPF)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">-</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPF_nvo)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(excessCostPF_nvo)}</td>
                                 </tr>
                             `;
                         } else {
                             // Fila Única (Color)
                             detailsHtml += `
                                 <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
-                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.prevPP} | PF:${mr.prevPF}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${mr.currPP} | PF:${mr.currPF}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-size:0.75rem; color:var(--text-muted);">PP:${consPP_ant} | PF:${consPF_ant}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.planCost)}</td>
-                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(mr.excessCost)}</td>
-                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(mr.totalCost)}</td>
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);">${mr.name} ${mr.serialNumber ? `<span style="font-size:0.75rem; color:var(--text-muted);">(${mr.serialNumber})</span>` : ''} <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; margin-left: 5px; color: var(--color-cyan);">TEXTO COLOR</span></td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevPP || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currPP || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(ppCost)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPP_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCostPP_ant)}</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                    <td style="text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-primary);"><span style="margin-left: 20px;"></span> <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; color: var(--color-cyan);">FOTOGRAFIA</span></td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.prevPF || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(mr.currPF || 0)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatNumber(consPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${pfCost > 0 ? PDFGenerator.formatCurrency(pfCost) : '-'}</td>
+                                    <td style="text-align: right; padding: 8px 10px;">${PDFGenerator.formatCurrency(excessCostPF_ant)}</td>
+                                    <td style="text-align: right; padding: 8px 10px; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(totalCostPF_ant)}</td>
                                 </tr>
                             `;
                         }
@@ -2477,7 +2881,14 @@ function getClientBaseAbono(client) {
             } else {
                 const plan = AppState.plans.find(p => p.id === m.planId);
                 if (plan) {
-                    totalBase += plan.cost;
+                    let cost = plan.cost;
+                    if (m.planComponentId && plan.components) {
+                        const comp = plan.components.find(c => c.id === m.planComponentId);
+                        if (comp) {
+                            cost = comp.cost;
+                        }
+                    }
+                    totalBase += cost;
                 }
             }
         }
@@ -2544,8 +2955,19 @@ function renderClientsTable() {
                 let defaultExcess = AppState.config.defaultExcessPrice;
                 if (!m.isFixed) {
                     const plan = AppState.plans.find(p => p.id === m.planId);
-                    planDesc = plan ? `${plan.name} (${plan.copies} copias)` : "Plan no encontrado";
-                    costDesc = m.customCost !== null ? `${PDFGenerator.formatCurrency(m.customCost)} (Pers.)` : (plan ? PDFGenerator.formatCurrency(plan.cost) : "-");
+                    let compDesc = "";
+                    if (plan && m.planComponentId) {
+                        const comp = plan.components.find(c => c.id === m.planComponentId);
+                        if (comp) {
+                            if (comp.type === 'bn') {
+                                compDesc = ` - ${comp.name} (${comp.copies} copias incl.)`;
+                            } else {
+                                compDesc = ` - ${comp.name}`;
+                            }
+                        }
+                    }
+                    planDesc = plan ? `${plan.name}${compDesc}` : "Plan no encontrado";
+                    costDesc = m.customCost !== null ? `${PDFGenerator.formatCurrency(m.customCost)} (Pers.)` : (plan ? (m.planComponentId && plan.components.find(c => c.id === m.planComponentId) ? PDFGenerator.formatCurrency(plan.components.find(c => c.id === m.planComponentId).cost) : PDFGenerator.formatCurrency(plan.cost)) : "-");
                     if (plan && plan.excessPrice !== undefined && plan.excessPrice !== null) {
                         defaultExcess = plan.excessPrice;
                     }
@@ -2612,8 +3034,47 @@ function renderConfigPlansTable() {
     const sorted = [...AppState.plans].sort((a,b) => a.copies - b.copies);
     sorted.forEach(p => {
         const tr = document.createElement("tr");
+        
+        let compsHtml = "";
+        if (p.components && p.components.length > 0) {
+            compsHtml = `<div class="plan-components-sublist" style="margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--color-cyan); display: flex; flex-direction: column; gap: 4px;">`;
+            p.components.forEach(c => {
+                let details = "";
+                let typeText = "";
+                if (c.type === "bn") {
+                    typeText = "B/N";
+                    details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | Copias: ${PDFGenerator.formatNumber(c.copies)} | Exc: ${PDFGenerator.formatCurrency(c.excessPrice)}`;
+                } else if (c.type === "color_common") {
+                    typeText = "Color Común";
+                    details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
+                } else if (c.type === "photo") {
+                    typeText = "Fotografía";
+                    details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
+                } else if (c.type === "ecografo") {
+                    typeText = "Ecógrafo";
+                    details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
+                } else if (c.type === "other") {
+                    typeText = "Otros";
+                    details = `Base: ${PDFGenerator.formatCurrency(c.cost)}`;
+                }
+                compsHtml += `
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                        <strong style="color: var(--color-cyan); font-weight: 600;">${c.name}</strong> 
+                        <span style="font-size:0.7rem; background:rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 3px; margin: 0 4px;">${typeText}</span> 
+                        <span style="font-family: monospace; opacity: 0.85;">${details}</span>
+                    </div>
+                `;
+            });
+            compsHtml += `</div>`;
+        } else {
+            compsHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; padding-left: 10px;">Sin componentes</div>`;
+        }
+
         tr.innerHTML = `
-            <td style="font-weight:600;">${p.name}</td>
+            <td>
+                <div style="font-weight:600; font-size: 0.95rem;">${p.name}</div>
+                ${compsHtml}
+            </td>
             <td>${PDFGenerator.formatNumber(p.copies)}</td>
             <td>${PDFGenerator.formatCurrency(p.cost)}</td>
             <td>${PDFGenerator.formatCurrency(p.excessPrice !== undefined && p.excessPrice !== null ? p.excessPrice : AppState.config.defaultExcessPrice)}</td>
@@ -2645,7 +3106,12 @@ function renderTempMachinesList() {
         let planDesc = "Concepto Fijo";
         if (!m.isFixed) {
             const plan = AppState.plans.find(p => p.id === m.planId);
-            planDesc = plan ? plan.name : "Plan personalizado";
+            let compName = "";
+            if (plan && m.planComponentId) {
+                const comp = plan.components.find(c => c.id === m.planComponentId);
+                if (comp) compName = " - " + comp.name;
+            }
+            planDesc = plan ? (plan.name + compName) : "Plan personalizado";
         }
 
         const cost = m.customCost !== null ? m.customCost : (m.isFixed ? 0 : "Default");
@@ -2955,9 +3421,9 @@ window.editPlan = function(planId) {
 
     AppState.editingPlanId = plan.id;
     document.getElementById("new-plan-name").value = plan.name;
-    document.getElementById("new-plan-copies").value = plan.copies;
-    document.getElementById("new-plan-cost").value = plan.cost;
-    document.getElementById("new-plan-excess").value = plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice;
+    
+    AppState.tempPlanComponents = JSON.parse(JSON.stringify(plan.components || []));
+    window.renderTempComponentsTable();
 
     document.getElementById("plan-form-title").innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Editar Plan';
     document.getElementById("btn-submit-plan").innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Cambios';
@@ -3132,18 +3598,36 @@ function processImportedRawRecords(records, sourceName) {
         clientObj.machines.forEach(m => {
             const rowRead = rows.find(r => (r.machineName || "").toLowerCase() === m.name.toLowerCase());
             
-            if (m.isFixed) {
-                const cost = m.customCost || 0;
+            let isColor = getMachineType(m.name) === "color";
+            let isEcografo = false;
+            let isOther = false;
+            if (!m.isFixed && m.planId) {
+                const plan = AppState.plans.find(p => p.id === m.planId);
+                if (plan && plan.components) {
+                    const comp = plan.components.find(c => c.id === m.planComponentId);
+                    if (comp) {
+                        if (comp.type === "ecografo") isEcografo = true;
+                        if (comp.type === "other") isOther = true;
+                    }
+                }
+            }
+
+            if (m.isFixed || isOther) {
+                let cost = 0;
+                if (m.isFixed) {
+                    cost = m.customCost || 0;
+                } else {
+                    cost = resolveOtherRates(m).cost;
+                }
                 machineReadings.push({
                     machineId: m.id, name: m.name, serialNumber: m.serialNumber,
                     prevCounter: 0, currCounter: 0, consumption: 0, planCopies: 0, excess: 0, excessPrice: 0,
-                    planCost: cost, excessCost: 0, totalCost: cost, isFixed: true
+                    planCost: cost, excessCost: 0, totalCost: cost, isFixed: true, planComponentId: m.planComponentId || ""
                 });
                 totalAbono += cost;
                 totalGeneral += cost;
             } else {
                 const hasRead = rowRead !== undefined;
-                const type = getMachineType(m.name);
                 
                 let isPending = true;
                 let prev = 0, curr = 0;
@@ -3153,7 +3637,7 @@ function processImportedRawRecords(records, sourceName) {
                 let prevPF = 0, currPF = 0;
                 
                 if (hasRead) {
-                    if (type === "color") {
+                    if (isColor) {
                         const hasPPPF = rowRead.prevPP !== undefined || rowRead.currPP !== undefined || rowRead.prevPF !== undefined || rowRead.currPF !== undefined;
                         if (hasPPPF) {
                             prevPP = parseInt(rowRead.prevPP) || 0;
@@ -3171,25 +3655,40 @@ function processImportedRawRecords(records, sourceName) {
                         prev = prevPP + prevPF;
                         curr = currPP + currPF;
                     } else {
-                        // Laser
+                        // Laser & Ecografo
                         if (rowRead.prevCounter !== undefined && rowRead.currCounter !== undefined && rowRead.prevCounter !== null && rowRead.currCounter !== null) {
                             prev = parseInt(rowRead.prevCounter) || 0;
                             curr = parseInt(rowRead.currCounter) || 0;
                             isPending = false;
                             
-                            // Informativos
-                            prevImp = parseInt(rowRead.prevImpresiones) || 0;
-                            currImp = parseInt(rowRead.currImpresiones) || 0;
-                            prevCop = parseInt(rowRead.prevCopias) || 0;
-                            currCop = parseInt(rowRead.currCopias) || 0;
+                            if (!isEcografo) {
+                                // Informativos
+                                prevImp = parseInt(rowRead.prevImpresiones) || 0;
+                                currImp = parseInt(rowRead.currImpresiones) || 0;
+                                prevCop = parseInt(rowRead.prevCopias) || 0;
+                                currCop = parseInt(rowRead.prevCopias) || 0;
+                            }
                         }
                     }
                 }
 
-                const plan = AppState.plans.find(p => p.id === m.planId) || { copies: 0, cost: 0 };
-                const planCopies = plan.copies;
-                const planCost = m.customCost !== null ? m.customCost : plan.cost;
-                const excessPrice = m.customExcessPrice !== null ? m.customExcessPrice : (plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : AppState.config.defaultExcessPrice);
+                let planCopies = 0;
+                let planCost = 0;
+                let excessPrice = 0;
+
+                if (isColor) {
+                    const rates = resolveColorRates(m);
+                    planCost = rates.ppCost + rates.pfCost;
+                } else if (isEcografo) {
+                    const rates = resolveEcografoRates(m);
+                    planCost = rates.cost;
+                    excessPrice = rates.pagePrice;
+                } else {
+                    const rates = resolveBNRates(m);
+                    planCost = rates.cost;
+                    planCopies = rates.copies;
+                    excessPrice = rates.excessPrice;
+                }
 
                 // Fórmulas
                 let consumption = 0;
@@ -3199,23 +3698,28 @@ function processImportedRawRecords(records, sourceName) {
 
                 if (!isPending) {
                     consumption = Math.max(0, curr - prev);
-                    if (type === "color") {
-                        const ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
-                        const pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+                    if (isColor) {
+                        const rates = resolveColorRates(m);
                         const consPP = Math.max(0, currPP - prevPP);
                         const consPF = Math.max(0, currPF - prevPF);
                         
-                        excessCost = (consPP * ppPrice) + (consPF * pfPrice);
+                        excessCost = (consPP * rates.ppPrice) + (consPF * rates.pfPrice);
                         excess = consumption;
                         totalCost = planCost + excessCost;
+                    } else if (isEcografo) {
+                        const rates = resolveEcografoRates(m);
+                        excess = consumption;
+                        excessCost = consumption * rates.pagePrice;
+                        totalCost = planCost + excessCost;
                     } else {
-                        if (planCopies === 0) {
+                        const rates = resolveBNRates(m);
+                        if (rates.copies === 0) {
                             excess = consumption;
-                            excessCost = consumption * excessPrice;
+                            excessCost = consumption * rates.excessPrice;
                             totalCost = planCost + excessCost;
                         } else {
-                            excess = Math.max(0, consumption - planCopies);
-                            excessCost = excess * excessPrice;
+                            excess = Math.max(0, consumption - rates.copies);
+                            excessCost = excess * rates.excessPrice;
                             totalCost = planCost + excessCost;
                         }
                     }
@@ -3225,7 +3729,7 @@ function processImportedRawRecords(records, sourceName) {
                     machineId: m.id, name: m.name, serialNumber: m.serialNumber,
                     prevCounter: prev, currCounter: curr, consumption: consumption, planCopies: planCopies,
                     excess: excess, excessPrice: excessPrice, planCost: planCost, excessCost: excessCost, totalCost: totalCost,
-                    isFixed: false, isPending: isPending,
+                    isFixed: false, isPending: isPending, planComponentId: m.planComponentId || "",
                     
                     // Sub-contadores
                     prevImpresiones: prevImp, currImpresiones: currImp,
@@ -3399,4 +3903,225 @@ window.generateDefaultObservations = function(clientObj) {
     });
 
     return parts.join(" - ") + ".";
+};
+
+// --- CONTROLES DE COMPONENTES DE PLAN ---
+window.togglePlanComponentFields = function() {
+    const type = document.getElementById("comp-type").value;
+    const fieldBn = document.getElementById("comp-field-bn");
+    const fieldPrice = document.getElementById("comp-field-price");
+    const labelPrice = document.getElementById("comp-price-label");
+    const pagePriceInput = document.getElementById("comp-page-price");
+
+    if (type === "bn") {
+        fieldBn.classList.remove("hidden");
+        fieldPrice.classList.add("hidden");
+    } else if (type === "other") {
+        fieldBn.classList.add("hidden");
+        fieldPrice.classList.add("hidden");
+    } else {
+        fieldBn.classList.add("hidden");
+        fieldPrice.classList.remove("hidden");
+        if (type === "color_common") {
+            labelPrice.innerText = "Precio Papel Común (PP) ($)";
+            pagePriceInput.value = AppState.config.defaultPPPrice || 300;
+        } else if (type === "photo") {
+            labelPrice.innerText = "Precio Papel Fotográfico (PF) ($)";
+            pagePriceInput.value = AppState.config.defaultPFPrice || 600;
+        } else if (type === "ecografo") {
+            labelPrice.innerText = "Precio por Página ($)";
+            pagePriceInput.value = 100;
+        }
+    }
+};
+
+window.renderTempComponentsTable = function() {
+    const tbody = document.getElementById("table-temp-components-body");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (!AppState.tempPlanComponents || AppState.tempPlanComponents.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 8px;">No hay componentes cargados aún.</td></tr>`;
+        return;
+    }
+    AppState.tempPlanComponents.forEach((c, idx) => {
+        let typeLabel = "";
+        let details = "";
+        if (c.type === "bn") {
+            typeLabel = "B/N";
+            details = `Copias: ${PDFGenerator.formatNumber(c.copies)} | Exc: ${PDFGenerator.formatCurrency(c.excessPrice)}`;
+        } else if (c.type === "color_common") {
+            typeLabel = "Color Común";
+            details = `Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
+        } else if (c.type === "photo") {
+            typeLabel = "Fotografía";
+            details = `Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
+        } else if (c.type === "ecografo") {
+            typeLabel = "Ecógrafo";
+            details = `Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
+        } else if (c.type === "other") {
+            typeLabel = "Otros";
+            details = "Fijo";
+        }
+        
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td style="padding: 4px 6px; font-weight:600;">${c.name}</td>
+            <td style="padding: 4px 6px;">${typeLabel}</td>
+            <td style="padding: 4px 6px; font-family:monospace; font-size:0.75rem;">${details}</td>
+            <td style="padding: 4px 6px; text-align: right;">${PDFGenerator.formatCurrency(c.cost)}</td>
+            <td style="padding: 4px 6px; text-align: center;">
+                <button type="button" class="btn-icon" style="color: var(--color-danger); background:none; border:none; cursor:pointer;" onclick="window.removePlanComponentTemp(${idx})">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+};
+
+window.addPlanComponentTemp = function() {
+    const nameInput = document.getElementById("comp-name");
+    const typeSelect = document.getElementById("comp-type");
+    const costInput = document.getElementById("comp-cost");
+    
+    if (!nameInput || !typeSelect || !costInput) return;
+    
+    const type = typeSelect.value;
+    let name = nameInput.value.trim();
+    if (!name) {
+        name = typeSelect.options[typeSelect.selectedIndex].text;
+    }
+    const cost = parseFloat(costInput.value) || 0;
+    
+    const comp = {
+        id: "comp-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+        name,
+        type,
+        cost
+    };
+    
+    if (type === "bn") {
+        comp.copies = parseInt(document.getElementById("comp-copies").value) || 0;
+        comp.excessPrice = parseFloat(document.getElementById("comp-excess-price").value) || 0;
+    } else if (type === "color_common" || type === "photo" || type === "ecografo") {
+        comp.pagePrice = parseFloat(document.getElementById("comp-page-price").value) || 0;
+    }
+    
+    if (!AppState.tempPlanComponents) {
+        AppState.tempPlanComponents = [];
+    }
+    AppState.tempPlanComponents.push(comp);
+    window.renderTempComponentsTable();
+    
+    // Reset component inputs
+    nameInput.value = "";
+    costInput.value = "0";
+    document.getElementById("comp-copies").value = "1500";
+    document.getElementById("comp-excess-price").value = AppState.config.defaultExcessPrice || 90;
+    document.getElementById("comp-page-price").value = "200";
+};
+
+window.removePlanComponentTemp = function(idx) {
+    if (AppState.tempPlanComponents && AppState.tempPlanComponents[idx]) {
+        AppState.tempPlanComponents.splice(idx, 1);
+        window.renderTempComponentsTable();
+    }
+};
+
+window.resolveColorRates = function(machine) {
+    let ppPrice = AppState.config.defaultPPPrice !== undefined ? AppState.config.defaultPPPrice : 300;
+    let pfPrice = AppState.config.defaultPFPrice !== undefined ? AppState.config.defaultPFPrice : 600;
+    let ppCost = 0;
+    let pfCost = 0;
+    
+    if (!machine.isFixed && machine.planId) {
+        const plan = AppState.plans.find(p => p.id === machine.planId);
+        if (plan && plan.components) {
+            const compPP = plan.components.find(c => c.type === 'color_common');
+            if (compPP) {
+                ppPrice = compPP.pagePrice !== undefined ? compPP.pagePrice : ppPrice;
+                ppCost = compPP.cost !== undefined ? compPP.cost : 0;
+            }
+            const compPF = plan.components.find(c => c.type === 'photo');
+            if (compPF) {
+                pfPrice = compPF.pagePrice !== undefined ? compPF.pagePrice : pfPrice;
+                pfCost = compPF.cost !== undefined ? compPF.cost : 0;
+            }
+        }
+    }
+    
+    if (machine.customCost !== null) ppCost = machine.customCost;
+    
+    return { ppPrice, pfPrice, ppCost, pfCost };
+};
+
+window.resolveBNRates = function(machine) {
+    let cost = 0;
+    let copies = 0;
+    let excessPrice = AppState.config.defaultExcessPrice !== undefined ? AppState.config.defaultExcessPrice : 90;
+    
+    if (!machine.isFixed && machine.planId) {
+        const plan = AppState.plans.find(p => p.id === machine.planId);
+        if (plan) {
+            cost = plan.cost;
+            copies = plan.copies;
+            excessPrice = plan.excessPrice !== undefined && plan.excessPrice !== null ? plan.excessPrice : excessPrice;
+            
+            if (machine.planComponentId && plan.components) {
+                const comp = plan.components.find(c => c.id === machine.planComponentId);
+                if (comp) {
+                    cost = comp.cost !== undefined ? comp.cost : cost;
+                    copies = comp.copies !== undefined ? comp.copies : copies;
+                    excessPrice = comp.excessPrice !== undefined ? comp.excessPrice : excessPrice;
+                }
+            }
+        }
+    }
+    
+    if (machine.customCost !== null) cost = machine.customCost;
+    if (machine.customExcessPrice !== null) excessPrice = machine.customExcessPrice;
+    
+    return { cost, copies, excessPrice };
+};
+
+window.resolveEcografoRates = function(machine) {
+    let cost = 0;
+    let pagePrice = 100;
+    
+    if (!machine.isFixed && machine.planId) {
+        const plan = AppState.plans.find(p => p.id === machine.planId);
+        if (plan) {
+            cost = plan.cost;
+            if (machine.planComponentId && plan.components) {
+                const comp = plan.components.find(c => c.id === machine.planComponentId);
+                if (comp) {
+                    cost = comp.cost !== undefined ? comp.cost : cost;
+                    pagePrice = comp.pagePrice !== undefined ? comp.pagePrice : pagePrice;
+                }
+            }
+        }
+    }
+    
+    if (machine.customCost !== null) cost = machine.customCost;
+    if (machine.customExcessPrice !== null) pagePrice = machine.customExcessPrice;
+    
+    return { cost, pagePrice };
+};
+
+window.resolveOtherRates = function(machine) {
+    let cost = 0;
+    if (!machine.isFixed && machine.planId) {
+        const plan = AppState.plans.find(p => p.id === machine.planId);
+        if (plan) {
+            cost = plan.cost;
+            if (machine.planComponentId && plan.components) {
+                const comp = plan.components.find(c => c.id === machine.planComponentId);
+                if (comp) {
+                    cost = comp.cost !== undefined ? comp.cost : cost;
+                }
+            }
+        }
+    }
+    if (machine.customCost !== null) cost = machine.customCost;
+    return { cost };
 };

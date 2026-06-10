@@ -14,7 +14,16 @@ const SUPABASE_URL      = 'https://sngigxlfemzteyokqlbd.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuZ2lneGxmZW16dGV5b2txbGJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1NDg0NTAsImV4cCI6MjA5NjEyNDQ1MH0.K-EreESHk-JjB3cZNDDJCENVSDJuKYJzUMLF78h-zkc';
 
 // Cliente Supabase (inicializado con el CDN cargado en index.html)
-const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let _sb = null;
+if (window.supabase) {
+    try {
+        _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+        console.error("Error al crear el cliente de Supabase:", err);
+    }
+} else {
+    console.warn("La biblioteca de Supabase no está cargada (posiblemente sin conexión o bloqueado por Brave Shields).");
+}
 
 const SupabaseAdapter = {
 
@@ -22,6 +31,9 @@ const SupabaseAdapter = {
     // CARGA: reconstruye el AppState desde todas las tablas de Supabase
     // -------------------------------------------------------------------------
     async loadData() {
+        if (!_sb) {
+            throw new Error("Supabase no está inicializado o no está disponible.");
+        }
         const [configRes, plansRes, clientsRes, machinesRes, readingsRes, mrRes] = await Promise.all([
             _sb.from('config').select('*'),
             _sb.from('plans').select('*'),
@@ -49,6 +61,7 @@ const SupabaseAdapter = {
             copies:      p.copies,
             cost:        p.cost,
             excessPrice: p.excess_price ?? null,
+            components:  p.components ?? [],
         }));
 
         // Índice de máquinas por cliente
@@ -62,6 +75,7 @@ const SupabaseAdapter = {
                 serialNumber:     m.serial_number || '',
                 isFixed:          m.is_fixed,
                 planId:           m.plan_id,
+                planComponentId:   m.plan_component_id || '',
                 customCost:       m.custom_cost,
                 customExcessPrice: m.custom_excess_price,
             });
@@ -122,6 +136,7 @@ const SupabaseAdapter = {
                 repCurrPP:          mr.rep_curr_pp ?? 0,
                 repPrevPF:          mr.rep_prev_pf ?? 0,
                 repCurrPF:          mr.rep_curr_pf ?? 0,
+                planComponentId:    mr.plan_component_id || '',
             });
         });
 
@@ -149,6 +164,9 @@ const SupabaseAdapter = {
     // Estrategia: delete-then-insert (igual que sobrescribir database.json)
     // -------------------------------------------------------------------------
     async saveData(payload) {
+        if (!_sb) {
+            throw new Error("Supabase no está inicializado o no está disponible.");
+        }
         // Orden de borrado: clientes primero (cascade elimina máquinas, lecturas y detalles)
         // Luego planes (ya sin máquinas que los referencien)
         const delClients = await _sb.from('clients').delete().not('id', 'is', null);
@@ -175,6 +193,7 @@ const SupabaseAdapter = {
                 copies:      p.copies,
                 cost:        p.cost,
                 excess_price: p.excessPrice ?? null,
+                components:  p.components ?? [],
             }));
             const { error } = await _sb.from('plans').insert(planRows);
             if (error) throw error;
@@ -200,6 +219,7 @@ const SupabaseAdapter = {
                     serial_number:       m.serialNumber || '',
                     is_fixed:            m.isFixed ?? false,
                     plan_id:             m.planId ?? null,
+                    plan_component_id:   m.planComponentId ?? '',
                     custom_cost:         m.customCost ?? null,
                     custom_excess_price: m.customExcessPrice ?? null,
                 }))
@@ -273,6 +293,7 @@ const SupabaseAdapter = {
                     rep_curr_pp:          mr.repCurrPP ?? 0,
                     rep_prev_pf:          mr.repPrevPF ?? 0,
                     rep_curr_pf:          mr.repCurrPF ?? 0,
+                    plan_component_id:    mr.planComponentId ?? '',
                 }))
             );
             if (mrRows.length) {

@@ -443,6 +443,12 @@
                                                     <!-- Loaded from configurations -->
                                                 </select>
                                             </div>
+                                            <div class="form-group">
+                                                <label for="machine-plan-component">Componente del Plan</label>
+                                                <select id="machine-plan-component">
+                                                    <option value="" disabled selected>Seleccione un componente...</option>
+                                                </select>
+                                            </div>
                                             <div class="form-row">
                                                 <div class="form-group">
                                                     <label for="machine-custom-cost">Abono Plan Fijo ($)</label>
@@ -593,22 +599,81 @@
                         </div>
                         <form id="form-add-plan" class="card-body">
                             <input type="hidden" id="plan-edit-id">
+                            
                             <div class="form-group">
-                                <label for="new-plan-name">Nombre del Plan</label>
-                                <input type="text" id="new-plan-name" placeholder="Ej: Plan 2.000 Copias" required>
+                                <label for="new-plan-name">Nombre del Plan Principal</label>
+                                <input type="text" id="new-plan-name" placeholder="Ej: Plan Combo Italia" required>
                             </div>
-                            <div class="form-group">
-                                <label for="new-plan-copies">Copias Incluidas</label>
-                                <input type="number" id="new-plan-copies" min="0" placeholder="Ej: 2000" required>
+                            
+                            <!-- Creador de Componentes -->
+                            <div style="margin-top: 15px; margin-bottom: 15px; padding: 12px; border: 1px dashed var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.02);">
+                                <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--color-cyan); margin-bottom: 10px; text-transform: uppercase;">
+                                    <i class="fa-solid fa-layer-group"></i> Componentes del Plan
+                                </h4>
+                                
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-name" style="font-size: 0.8rem;">Nombre Componente</label>
+                                        <input type="text" id="comp-name" placeholder="Ej: Ricoh B/N">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-type" style="font-size: 0.8rem;">Tipo Cobro</label>
+                                        <select id="comp-type" onchange="window.togglePlanComponentFields()">
+                                            <option value="bn" selected>B/N con copias</option>
+                                            <option value="color_common">Color papel común</option>
+                                            <option value="photo">Fotografía</option>
+                                            <option value="ecografo">Ecógrafo</option>
+                                            <option value="other">Otros consumos</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-cost" style="font-size: 0.8rem;">Abono Base ($)</label>
+                                        <input type="number" id="comp-cost" min="0" value="0">
+                                    </div>
+                                </div>
+                                
+                                <div id="comp-field-bn" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-copies" style="font-size: 0.8rem;">Copias Incluidas</label>
+                                        <input type="number" id="comp-copies" min="0" value="1500">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-excess-price" style="font-size: 0.8rem;">Precio Copia Exc. ($)</label>
+                                        <input type="number" id="comp-excess-price" min="0" value="90">
+                                    </div>
+                                </div>
+                                
+                                <div id="comp-field-price" class="hidden" style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 12px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-page-price" id="comp-price-label" style="font-size: 0.8rem;">Precio por Página ($)</label>
+                                        <input type="number" id="comp-page-price" min="0" value="200">
+                                    </div>
+                                </div>
+                                
+                                <button type="button" class="btn btn-secondary btn-sm" id="btn-add-comp-temp" style="margin-bottom: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <i class="fa-solid fa-plus"></i> Agregar Componente
+                                </button>
+                                
+                                <div class="table-container mb-2" style="max-height: 150px; overflow-y: auto;">
+                                    <table class="data-table" style="font-size: 0.8rem; margin-bottom: 0;" id="table-temp-components">
+                                        <thead>
+                                            <tr style="background: var(--bg-body);">
+                                                <th style="padding: 4px 6px;">Nombre</th>
+                                                <th style="padding: 4px 6px;">Tipo</th>
+                                                <th style="padding: 4px 6px;">Detalles</th>
+                                                <th style="padding: 4px 6px; text-align: right;">Base ($)</th>
+                                                <th style="padding: 4px 6px; text-align: center; width: 40px;"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="table-temp-components-body">
+                                            <tr>
+                                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 8px;">No hay componentes cargados aún.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="new-plan-cost">Costo Base ($)</label>
-                                <input type="number" id="new-plan-cost" min="0" placeholder="Ej: 110000" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="new-plan-excess">Valor por Copia Excedente ($)</label>
-                                <input type="number" id="new-plan-excess" min="0" step="0.1" placeholder="Ej: 90" required>
-                            </div>
+                            
                             <div class="form-actions-row">
                                 <button type="button" class="btn btn-secondary hidden" id="btn-cancel-plan-edit">Cancelar</button>
                                 <button type="submit" class="btn btn-primary" id="btn-submit-plan"><i class="fa-solid fa-plus"></i> Crear Plan</button>
