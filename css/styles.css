@@ -1308,8 +1308,8 @@ body.light-mode .drop-zone-loader {
 
     .invoice-container {
         width: 100% !important;
+        min-height: 294mm !important;
         height: auto !important;
-        max-height: none !important;
-        min-height: auto !important;
+        box-sizing: border-box;
     }
 }
