@@ -124,7 +124,19 @@ def init_db():
     except sqlite3.OperationalError:
         pass
     try:
+        conn.execute("ALTER TABLE plans ADD COLUMN excess_price REAL")
+    except sqlite3.OperationalError:
+        pass
+    try:
         conn.execute("ALTER TABLE machines ADD COLUMN plan_component_id TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE readings ADD COLUMN upload_date TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE readings ADD COLUMN uploaded_by TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
 
