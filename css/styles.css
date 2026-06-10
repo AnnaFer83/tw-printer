@@ -1277,12 +1277,12 @@ body.light-mode .drop-zone-loader {
 }
 
 /* Estilos de Impresión Físicos */
-@media print {
-    @page {
-        margin: 0;
-        size: A4 portrait;
-    }
+@page {
+    margin: 0;
+    size: A4 portrait;
+}
 
+@media print {
     body {
         background-color: white !important;
         color: black !important;
