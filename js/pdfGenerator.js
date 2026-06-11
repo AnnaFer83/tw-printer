@@ -22,7 +22,14 @@ const PDFGenerator = {
      */
     _buildTableRows(machineReadings) {
         return machineReadings.map(mr => {
-            const type = window.getMachineType(mr.name);
+            let machine = null;
+            if (typeof AppState !== "undefined" && AppState.clients) {
+                for (const client of AppState.clients) {
+                    machine = client.machines.find(m => m.id === mr.machineId);
+                    if (machine) break;
+                }
+            }
+            const type = window.getMachineType(mr.name, machine);
             const hasRep = mr.hasReplacement || false;
 
             if (mr.isFixed) {
@@ -285,7 +292,14 @@ const PDFGenerator = {
 
         record.machineReadings.forEach(mr => {
             if (mr.isFixed || mr.isPending) return;
-            const type = window.getMachineType(mr.name);
+            let machine = null;
+            if (typeof AppState !== "undefined" && AppState.clients) {
+                for (const client of AppState.clients) {
+                    machine = client.machines.find(m => m.id === mr.machineId);
+                    if (machine) break;
+                }
+            }
+            const type = window.getMachineType(mr.name, machine);
             const hasRep = mr.hasReplacement || false;
 
             if (type === "color") {

@@ -620,6 +620,7 @@
                                         <label for="comp-type" style="font-size: 0.8rem;">Tipo Cobro</label>
                                         <select id="comp-type" onchange="window.togglePlanComponentFields()">
                                             <option value="bn" selected>B/N con copias</option>
+                                            <option value="color_combined">Color Combinado (Común + Foto)</option>
                                             <option value="color_common">Color papel común</option>
                                             <option value="photo">Fotografía</option>
                                             <option value="ecografo">Ecógrafo</option>
@@ -647,6 +648,17 @@
                                     <div class="form-group" style="margin-bottom: 0;">
                                         <label for="comp-page-price" id="comp-price-label" style="font-size: 0.8rem;">Precio por Página ($)</label>
                                         <input type="number" id="comp-page-price" min="0" value="200">
+                                    </div>
+                                </div>
+
+                                <div id="comp-field-color-combined" class="hidden" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-page-price-pp" style="font-size: 0.8rem;">Precio Papel Común (PP) ($)</label>
+                                        <input type="number" id="comp-page-price-pp" min="0" value="200">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label for="comp-page-price-pf" style="font-size: 0.8rem;">Precio Papel Foto (PF) ($)</label>
+                                        <input type="number" id="comp-page-price-pf" min="0" value="100">
                                     </div>
                                 </div>
                                 
@@ -773,6 +785,24 @@
                 <p style="font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700; color: #475569 !important; margin: 0;" id="pdf-val-notes">
                     Av. 9 de Julio 1241 - Wps 3704-280259
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMACIÓN DE GUARDADO -->
+    <div id="save-confirm-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <i class="fa-solid fa-triangle-exclamation modal-warning-icon"></i>
+            <div class="modal-header">
+                <h3>⚠️ Confirmación de Lectura</h3>
+            </div>
+            <div class="modal-body">
+                <p class="modal-accent-msg">REVISAR SI LOS DATOS CARGADOS SON CORRECTOS</p>
+                <p class="modal-desc-msg">Una vez guardada la lectura, los datos serán utilizados para el cálculo de consumos, excedentes y facturación.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btn-confirm-save-no">NO</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-save-yes">SI</button>
             </div>
         </div>
     </div>

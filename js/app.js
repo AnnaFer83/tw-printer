@@ -22,10 +22,22 @@ const AppState = {
     billingChart: null
 };
 
-window.getMachineType = function(machineName) {
+window.getMachineType = function(machineName, machine) {
     const name = (machineName || "").toLowerCase();
     if (name.includes("canon") || name.includes("color") || name.includes("g3100") || name.includes("g2100") || name.includes("g1100") || name.includes("g1000")) {
         return "color";
+    }
+    if (machine) {
+        let comp = null;
+        if (!machine.isFixed && machine.planId && typeof AppState !== "undefined" && AppState.plans) {
+            const plan = AppState.plans.find(p => p.id === machine.planId);
+            if (plan && plan.components) {
+                comp = plan.components.find(c => c.id === machine.planComponentId);
+            }
+        }
+        if (comp && (comp.type === "color_combined" || comp.type === "color_common" || comp.type === "photo")) {
+            return "color";
+        }
     }
     return "laser";
 };
@@ -625,7 +637,7 @@ function setupEventListeners() {
         clientObj.machines.forEach(m => {
             if (validationError) return;
 
-            let isColor = getMachineType(m.name) === "color";
+            let isColor = getMachineType(m.name, m) === "color";
             let isEcografo = false;
             let isOther = false;
             if (!m.isFixed && m.planId) {
@@ -1023,18 +1035,30 @@ function setupEventListeners() {
             user: AppState.config.currentUser || "Administrador"
         };
 
-        // Reemplazar o insertar en el listado
+        // Almacenar el registro temporalmente para la confirmación del modal
+        window.pendingSaveRecord = record;
+        window.pendingSaveClientName = clientObj.name;
+
+        // Abrir modal de confirmación
+        document.getElementById("save-confirm-modal").classList.remove("hidden");
+    });
+
+    // Confirmación de Guardado - SI
+    document.getElementById("btn-confirm-save-yes").addEventListener("click", () => {
+        const record = window.pendingSaveRecord;
+        const clientName = window.pendingSaveClientName;
+        if (!record) return;
+
         const existingIdx = AppState.readings.findIndex(r => 
-            r.clientId === clientObj.id && 
-            r.periodMonth.toLowerCase() === month.toLowerCase() && 
-            parseInt(r.periodYear) === year
+            r.clientId === record.clientId && 
+            r.periodMonth.toLowerCase() === record.periodMonth.toLowerCase() && 
+            parseInt(r.periodYear) === record.periodYear
         );
+
         if (existingIdx !== -1) {
             AppState.readings[existingIdx] = record;
-            showToast(`Consumos de ${clientObj.name} actualizados.`);
         } else {
             AppState.readings.push(record);
-            showToast(`Consumos de ${clientObj.name} guardados correctamente.`);
         }
 
         saveReadingsToStorage();
@@ -1042,12 +1066,26 @@ function setupEventListeners() {
         updateStats();
         updateBillingChart();
 
-        // Ocultar planilla e inicializar campos
+        // Mostrar notificación de éxito
+        showToast("Lectura guardada correctamente.");
+
+        // Ocultar modal, planilla e inicializar campos
+        document.getElementById("save-confirm-modal").classList.add("hidden");
         document.getElementById("multi-machine-entry-container").classList.add("hidden");
         document.getElementById("multi-machine-placeholder").classList.remove("hidden");
-        selectClient.selectedIndex = 0;
-        
+        document.getElementById("entry-client").selectedIndex = 0;
+
+        window.pendingSaveRecord = null;
+        window.pendingSaveClientName = null;
+
         switchTab("dashboard");
+    });
+
+    // Confirmación de Guardado - NO
+    document.getElementById("btn-confirm-save-no").addEventListener("click", () => {
+        document.getElementById("save-confirm-modal").classList.add("hidden");
+        window.pendingSaveRecord = null;
+        window.pendingSaveClientName = null;
     });
 
     // 6. Configuración de Planes Habituales: Crear/Editar Plan
@@ -1566,7 +1604,7 @@ function setupMultiMachineInputSheet(clientObj) {
             }
         }
 
-        let isColor = getMachineType(m.name) === "color";
+        let isColor = getMachineType(m.name, m) === "color";
         let isEcografo = false;
         let isOther = false;
         if (!m.isFixed && m.planId) {
@@ -1611,47 +1649,45 @@ function setupMultiMachineInputSheet(clientObj) {
             }
 
             if (isColor) {
-                // Fila principal PP
-                const trPP = document.createElement("tr");
-                trPP.className = "main-machine-row";
-                trPP.innerHTML = `
+                // Fila principal Color con Pestañas
+                const trColor = document.createElement("tr");
+                trColor.className = "main-machine-row";
+                trColor.innerHTML = `
                     <td>
                         <div style="font-weight:600;">${m.name}</div>
                         <div style="font-size:0.7rem; color:var(--text-muted);">S/N: ${m.serialNumber || 'Sin serie'}</div>
                         <label style="font-size:0.75rem; margin-top:5px; display:inline-block; cursor:pointer; color: var(--color-cyan);">
                             <input type="checkbox" id="has-replacement-${m.id}" onchange="toggleReplacementRow('${m.id}')" ${hasRepChecked}> Hubo cambio de equipo
                         </label>
+                        <br>
+                        <div class="color-tabs-container">
+                            <button type="button" class="color-tab-btn active" id="tab-btn-common-${m.id}" onclick="switchColorTab('${m.id}', 'common')">Papel Común</button>
+                            <button type="button" class="color-tab-btn" id="tab-btn-photo-${m.id}" onclick="switchColorTab('${m.id}', 'photo')">Papel Foto</button>
+                        </div>
                     </td>
                     <td>
-                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PP Anterior:</span>
-                        <input type="number" id="prev-pp-${m.id}" value="${prevPPVal}" min="0" oninput="recalcMultiSheetPreview()">
+                        <div id="wrapper-prev-pp-${m.id}">
+                            <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PP Anterior:</span>
+                            <input type="number" id="prev-pp-${m.id}" value="${prevPPVal}" min="0" oninput="recalcMultiSheetPreview()">
+                        </div>
+                        <div id="wrapper-prev-pf-${m.id}" class="hidden">
+                            <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PF Anterior:</span>
+                            <input type="number" id="prev-pf-${m.id}" value="${prevPFVal}" min="0" oninput="recalcMultiSheetPreview()">
+                        </div>
                     </td>
                     <td>
-                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PP Actual:</span>
-                        <input type="number" id="curr-pp-${m.id}" value="${currPPVal}" min="0" oninput="recalcMultiSheetPreview()">
+                        <div id="wrapper-curr-pp-${m.id}">
+                            <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PP Actual:</span>
+                            <input type="number" id="curr-pp-${m.id}" value="${currPPVal}" min="0" oninput="recalcMultiSheetPreview()">
+                        </div>
+                        <div id="wrapper-curr-pf-${m.id}" class="hidden">
+                            <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PF Actual:</span>
+                            <input type="number" id="curr-pf-${m.id}" value="${currPFVal}" min="0" oninput="recalcMultiSheetPreview()">
+                        </div>
                     </td>
                     <td class="text-right" id="total-preview-${m.id}" style="font-weight:600; padding-right: 5px; vertical-align: middle;">${PDFGenerator.formatCurrency(abono)}</td>
                 `;
-                tbody.appendChild(trPP);
-
-                // Fila sub-contador PF
-                const trPF = document.createElement("tr");
-                trPF.className = "sub-counter-row";
-                trPF.innerHTML = `
-                    <td>
-                        <div style="padding-left:15px; font-size:0.8rem; color:var(--text-muted);"><i class="fa-solid fa-angle-right" style="margin-right:5px;"></i>Papel Foto (PF)</div>
-                    </td>
-                    <td>
-                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PF Anterior:</span>
-                        <input type="number" id="prev-pf-${m.id}" value="${prevPFVal}" min="0" oninput="recalcMultiSheetPreview()">
-                    </td>
-                    <td>
-                        <span style="font-size:0.7rem; color:var(--text-muted); display:block; margin-bottom:2px;">PF Actual:</span>
-                        <input type="number" id="curr-pf-${m.id}" value="${currPFVal}" min="0" oninput="recalcMultiSheetPreview()">
-                    </td>
-                    <td></td>
-                `;
-                tbody.appendChild(trPF);
+                tbody.appendChild(trColor);
             } else if (isEcografo) {
                 // Ecógrafo: fila principal Contador
                 const trCont = document.createElement("tr");
@@ -1748,7 +1784,7 @@ function setupMultiMachineInputSheet(clientObj) {
             let repInputsHtml = "";
             if (isColor) {
                 repInputsHtml = `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div id="wrapper-rep-pp-${m.id}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                         <div>
                             <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PP Inicial</label>
                             <input type="number" id="rep-prev-pp-${m.id}" value="${repPrevPPVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
@@ -1757,6 +1793,8 @@ function setupMultiMachineInputSheet(clientObj) {
                             <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PP Final</label>
                             <input type="number" id="rep-curr-pp-${m.id}" value="${repCurrPPVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
                         </div>
+                    </div>
+                    <div id="wrapper-rep-pf-${m.id}" class="hidden" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                         <div>
                             <label style="font-size:0.7rem; display:block; color:var(--text-muted);">PF Inicial</label>
                             <input type="number" id="rep-prev-pf-${m.id}" value="${repPrevPFVal}" min="0" oninput="recalcMultiSheetPreview()" style="width:100%; padding:4px; font-size:0.8rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
@@ -1852,6 +1890,46 @@ function setupMultiMachineInputSheet(clientObj) {
 }
 
 /**
+ * Alterna entre las pestañas de Papel Común (PP) y Papel Foto (PF) para un equipo color
+ */
+window.switchColorTab = function(machineId, tabType) {
+    const btnCommon = document.getElementById(`tab-btn-common-${machineId}`);
+    const btnPhoto = document.getElementById(`tab-btn-photo-${machineId}`);
+    
+    const wrapPrevPP = document.getElementById(`wrapper-prev-pp-${machineId}`);
+    const wrapPrevPF = document.getElementById(`wrapper-prev-pf-${machineId}`);
+    const wrapCurrPP = document.getElementById(`wrapper-curr-pp-${machineId}`);
+    const wrapCurrPF = document.getElementById(`wrapper-curr-pf-${machineId}`);
+    
+    const wrapRepPP = document.getElementById(`wrapper-rep-pp-${machineId}`);
+    const wrapRepPF = document.getElementById(`wrapper-rep-pf-${machineId}`);
+
+    if (tabType === 'common') {
+        if (btnCommon) btnCommon.classList.add('active');
+        if (btnPhoto) btnPhoto.classList.remove('active');
+        
+        if (wrapPrevPP) wrapPrevPP.classList.remove('hidden');
+        if (wrapPrevPF) wrapPrevPF.classList.add('hidden');
+        if (wrapCurrPP) wrapCurrPP.classList.remove('hidden');
+        if (wrapCurrPF) wrapCurrPF.classList.add('hidden');
+        
+        if (wrapRepPP) wrapRepPP.classList.remove('hidden');
+        if (wrapRepPF) wrapRepPF.classList.add('hidden');
+    } else {
+        if (btnCommon) btnCommon.classList.remove('active');
+        if (btnPhoto) btnPhoto.classList.add('active');
+        
+        if (wrapPrevPP) wrapPrevPP.classList.add('hidden');
+        if (wrapPrevPF) wrapPrevPF.classList.remove('hidden');
+        if (wrapCurrPP) wrapCurrPP.classList.add('hidden');
+        if (wrapCurrPF) wrapCurrPF.classList.remove('hidden');
+        
+        if (wrapRepPP) wrapRepPP.classList.add('hidden');
+        if (wrapRepPF) wrapRepPF.classList.remove('hidden');
+    }
+};
+
+/**
  * Muestra/oculta la fila de reemplazo del equipo
  */
 window.toggleReplacementRow = function(machineId) {
@@ -1879,7 +1957,7 @@ window.recalcMultiSheetPreview = function() {
     let hasPending = false;
 
     clientObj.machines.forEach(m => {
-        let isColor = getMachineType(m.name) === "color";
+        let isColor = getMachineType(m.name, m) === "color";
         let isEcografo = false;
         let isOther = false;
         if (!m.isFixed && m.planId) {
@@ -2077,7 +2155,7 @@ function recalculateAllReadings() {
             const m = clientObj.machines.find(mac => mac.id === mr.machineId);
             if (!m) return;
 
-            let isColor = getMachineType(m.name) === "color";
+            let isColor = getMachineType(m.name, m) === "color";
             let isEcografo = false;
             let isOther = false;
             if (!m.isFixed && m.planId) {
@@ -2475,7 +2553,8 @@ function renderReadingsTable() {
             let foundLaserPrice = false;
 
             r.machineReadings.forEach(mr => {
-                const type = getMachineType(mr.name);
+                const m = c.machines.find(mac => mac.id === mr.machineId);
+                const type = getMachineType(mr.name, m);
                 const hasRep = mr.hasReplacement || false;
 
                 if (mr.isFixed) {
@@ -3049,6 +3128,9 @@ function renderConfigPlansTable() {
                 if (c.type === "bn") {
                     typeText = "B/N";
                     details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | Copias: ${PDFGenerator.formatNumber(c.copies)} | Exc: ${PDFGenerator.formatCurrency(c.excessPrice)}`;
+                } else if (c.type === "color_combined") {
+                    typeText = "Color Combinado";
+                    details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | PP: ${PDFGenerator.formatCurrency(c.pagePrice)} | PF: ${PDFGenerator.formatCurrency(c.pagePricePhoto)}`;
                 } else if (c.type === "color_common") {
                     typeText = "Color Común";
                     details = `Base: ${PDFGenerator.formatCurrency(c.cost)} | Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
@@ -3603,7 +3685,7 @@ function processImportedRawRecords(records, sourceName) {
         clientObj.machines.forEach(m => {
             const rowRead = rows.find(r => (r.machineName || "").toLowerCase() === m.name.toLowerCase());
             
-            let isColor = getMachineType(m.name) === "color";
+            let isColor = getMachineType(m.name, m) === "color";
             let isEcografo = false;
             let isOther = false;
             if (!m.isFixed && m.planId) {
@@ -3915,17 +3997,26 @@ window.togglePlanComponentFields = function() {
     const type = document.getElementById("comp-type").value;
     const fieldBn = document.getElementById("comp-field-bn");
     const fieldPrice = document.getElementById("comp-field-price");
+    const fieldColorCombined = document.getElementById("comp-field-color-combined");
     const labelPrice = document.getElementById("comp-price-label");
     const pagePriceInput = document.getElementById("comp-page-price");
 
+    // Hide all first
+    fieldBn.classList.add("hidden");
+    fieldPrice.classList.add("hidden");
+    if (fieldColorCombined) fieldColorCombined.classList.add("hidden");
+
     if (type === "bn") {
         fieldBn.classList.remove("hidden");
-        fieldPrice.classList.add("hidden");
+    } else if (type === "color_combined") {
+        if (fieldColorCombined) {
+            fieldColorCombined.classList.remove("hidden");
+            document.getElementById("comp-page-price-pp").value = AppState.config.defaultPPPrice || 300;
+            document.getElementById("comp-page-price-pf").value = AppState.config.defaultPFPrice || 600;
+        }
     } else if (type === "other") {
-        fieldBn.classList.add("hidden");
-        fieldPrice.classList.add("hidden");
+        // No extra fields
     } else {
-        fieldBn.classList.add("hidden");
         fieldPrice.classList.remove("hidden");
         if (type === "color_common") {
             labelPrice.innerText = "Precio Papel Común (PP) ($)";
@@ -3954,6 +4045,9 @@ window.renderTempComponentsTable = function() {
         if (c.type === "bn") {
             typeLabel = "B/N";
             details = `Copias: ${PDFGenerator.formatNumber(c.copies)} | Exc: ${PDFGenerator.formatCurrency(c.excessPrice)}`;
+        } else if (c.type === "color_combined") {
+            typeLabel = "Color Combinado";
+            details = `PP: ${PDFGenerator.formatCurrency(c.pagePrice)} | PF: ${PDFGenerator.formatCurrency(c.pagePricePhoto)}`;
         } else if (c.type === "color_common") {
             typeLabel = "Color Común";
             details = `Pág: ${PDFGenerator.formatCurrency(c.pagePrice)}`;
@@ -3970,13 +4064,13 @@ window.renderTempComponentsTable = function() {
         
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td style="padding: 4px 6px; font-weight:600;">${c.name}</td>
-            <td style="padding: 4px 6px;">${typeLabel}</td>
-            <td style="padding: 4px 6px; font-family:monospace; font-size:0.75rem;">${details}</td>
-            <td style="padding: 4px 6px; text-align: right;">${PDFGenerator.formatCurrency(c.cost)}</td>
-            <td style="padding: 4px 6px; text-align: center;">
-                <button type="button" class="btn-icon" style="color: var(--color-danger); background:none; border:none; cursor:pointer;" onclick="window.removePlanComponentTemp(${idx})">
-                    <i class="fa-solid fa-trash-can"></i>
+            <td style="padding: 6px; font-weight: 600; color: var(--text-primary);">${c.name}</td>
+            <td style="padding: 6px;"><span class="badge badge-secondary" style="font-size:0.65rem; padding: 2px 4px;">${typeLabel}</span></td>
+            <td style="padding: 6px; font-family: monospace; color: var(--text-muted);">${details}</td>
+            <td style="padding: 6px; text-align: right; font-weight: 600; color: var(--color-success);">${PDFGenerator.formatCurrency(c.cost)}</td>
+            <td style="padding: 6px; text-align: center;">
+                <button type="button" class="btn-icon btn-delete" style="padding: 2px 6px;" onclick="window.removePlanComponentTemp(${idx})">
+                    <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
                 </button>
             </td>
         `;
@@ -4008,6 +4102,9 @@ window.addPlanComponentTemp = function() {
     if (type === "bn") {
         comp.copies = parseInt(document.getElementById("comp-copies").value) || 0;
         comp.excessPrice = parseFloat(document.getElementById("comp-excess-price").value) || 0;
+    } else if (type === "color_combined") {
+        comp.pagePrice = parseFloat(document.getElementById("comp-page-price-pp").value) || 0;
+        comp.pagePricePhoto = parseFloat(document.getElementById("comp-page-price-pf").value) || 0;
     } else if (type === "color_common" || type === "photo" || type === "ecografo") {
         comp.pagePrice = parseFloat(document.getElementById("comp-page-price").value) || 0;
     }
@@ -4024,6 +4121,8 @@ window.addPlanComponentTemp = function() {
     document.getElementById("comp-copies").value = "1500";
     document.getElementById("comp-excess-price").value = AppState.config.defaultExcessPrice || 90;
     document.getElementById("comp-page-price").value = "200";
+    if (document.getElementById("comp-page-price-pp")) document.getElementById("comp-page-price-pp").value = "200";
+    if (document.getElementById("comp-page-price-pf")) document.getElementById("comp-page-price-pf").value = "100";
 };
 
 window.removePlanComponentTemp = function(idx) {
@@ -4042,15 +4141,23 @@ window.resolveColorRates = function(machine) {
     if (!machine.isFixed && machine.planId) {
         const plan = AppState.plans.find(p => p.id === machine.planId);
         if (plan && plan.components) {
-            const compPP = plan.components.find(c => c.type === 'color_common');
-            if (compPP) {
-                ppPrice = compPP.pagePrice !== undefined ? compPP.pagePrice : ppPrice;
-                ppCost = compPP.cost !== undefined ? compPP.cost : 0;
-            }
-            const compPF = plan.components.find(c => c.type === 'photo');
-            if (compPF) {
-                pfPrice = compPF.pagePrice !== undefined ? compPF.pagePrice : pfPrice;
-                pfCost = compPF.cost !== undefined ? compPF.cost : 0;
+            const compCombined = plan.components.find(c => c.type === 'color_combined');
+            if (compCombined) {
+                ppPrice = compCombined.pagePrice !== undefined ? compCombined.pagePrice : ppPrice;
+                pfPrice = compCombined.pagePricePhoto !== undefined ? compCombined.pagePricePhoto : pfPrice;
+                ppCost = compCombined.cost !== undefined ? compCombined.cost : 0;
+                pfCost = 0; // Abono completo está en ppCost
+            } else {
+                const compPP = plan.components.find(c => c.type === 'color_common');
+                if (compPP) {
+                    ppPrice = compPP.pagePrice !== undefined ? compPP.pagePrice : ppPrice;
+                    ppCost = compPP.cost !== undefined ? compPP.cost : 0;
+                }
+                const compPF = plan.components.find(c => c.type === 'photo');
+                if (compPF) {
+                    pfPrice = compPF.pagePrice !== undefined ? compPF.pagePrice : pfPrice;
+                    pfCost = compPF.cost !== undefined ? compPF.cost : 0;
+                }
             }
         }
     }
