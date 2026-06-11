@@ -619,19 +619,20 @@ function setupEventListeners() {
 
     // Guardar lecturas de la planilla del Dashboard
     document.getElementById("btn-save-multi-readings").addEventListener("click", () => {
-        const clientId = selectClient.value;
-        const clientObj = AppState.clients.find(c => c.id === clientId);
-        if (!clientObj) return;
+        try {
+            const clientId = selectClient.value;
+            const clientObj = AppState.clients.find(c => c.id === clientId);
+            if (!clientObj) return;
 
-        const month = document.getElementById("entry-period-month").value;
-        const year = parseInt(document.getElementById("entry-period-year").value) || 2026;
-        const notes = document.getElementById("entry-notes").value.trim();
+            const month = document.getElementById("entry-period-month").value;
+            const year = parseInt(document.getElementById("entry-period-year").value) || 2026;
+            const notes = document.getElementById("entry-notes").value.trim();
 
-        const machineReadings = [];
-        let totalAbono = 0;
-        let totalExcessCost = 0;
-        let totalGeneral = 0;
-        let validationError = false;
+            const machineReadings = [];
+            let totalAbono = 0;
+            let totalExcessCost = 0;
+            let totalGeneral = 0;
+            let validationError = false;
 
         // Recorrer filas de la planilla
         clientObj.machines.forEach(m => {
@@ -875,10 +876,14 @@ function setupEventListeners() {
                         }
 
                         // Sub-contadores informativos
-                        prevImp = parseInt(document.getElementById(`prev-impresiones-${m.id}`)?.value) || 0;
-                        currImp = parseInt(document.getElementById(`curr-impresiones-${m.id}`)?.value) || 0;
-                        prevCop = parseInt(document.getElementById(`prev-copias-${m.id}`)?.value) || 0;
-                        currCop = parseInt(document.getElementById(`curr-copias-${m.id}`)?.value) || 0;
+                        const prevImpEl = document.getElementById(`prev-impresiones-${m.id}`);
+                        const currImpEl = document.getElementById(`curr-impresiones-${m.id}`);
+                        const prevCopEl = document.getElementById(`prev-copias-${m.id}`);
+                        const currCopEl = document.getElementById(`curr-copias-${m.id}`);
+                        prevImp = prevImpEl && prevImpEl.value.trim() !== "" ? parseInt(prevImpEl.value) || 0 : 0;
+                        currImp = currImpEl && currImpEl.value.trim() !== "" ? parseInt(currImpEl.value) || 0 : 0;
+                        prevCop = prevCopEl && prevCopEl.value.trim() !== "" ? parseInt(prevCopEl.value) || 0 : 0;
+                        currCop = currCopEl && currCopEl.value.trim() !== "" ? parseInt(currCopEl.value) || 0 : 0;
                     }
 
                     if (hasRep) {
@@ -909,10 +914,14 @@ function setupEventListeners() {
                                 return;
                             }
 
-                            repPrevImp = parseInt(document.getElementById(`rep-prev-impresiones-${m.id}`)?.value) || 0;
-                            repCurrImp = parseInt(document.getElementById(`rep-curr-impresiones-${m.id}`)?.value) || 0;
-                            repPrevCop = parseInt(document.getElementById(`rep-prev-copias-${m.id}`)?.value) || 0;
-                            repCurrCop = parseInt(document.getElementById(`rep-curr-copias-${m.id}`)?.value) || 0;
+                            const repPrevImpEl = document.getElementById(`rep-prev-impresiones-${m.id}`);
+                            const repCurrImpEl = document.getElementById(`rep-curr-impresiones-${m.id}`);
+                            const repPrevCopEl = document.getElementById(`rep-prev-copias-${m.id}`);
+                            const repCurrCopEl = document.getElementById(`rep-curr-copias-${m.id}`);
+                            repPrevImp = repPrevImpEl && repPrevImpEl.value.trim() !== "" ? parseInt(repPrevImpEl.value) || 0 : 0;
+                            repCurrImp = repCurrImpEl && repCurrImpEl.value.trim() !== "" ? parseInt(repCurrImpEl.value) || 0 : 0;
+                            repPrevCop = repPrevCopEl && repPrevCopEl.value.trim() !== "" ? parseInt(repPrevCopEl.value) || 0 : 0;
+                            repCurrCop = repCurrCopEl && repCurrCopEl.value.trim() !== "" ? parseInt(repCurrCopEl.value) || 0 : 0;
                         }
                     }
                 }
@@ -1041,44 +1050,53 @@ function setupEventListeners() {
 
         // Abrir modal de confirmación
         document.getElementById("save-confirm-modal").classList.remove("hidden");
+        } catch (error) {
+            console.error("Error al preparar lectura para guardar:", error);
+            showToast("Error al preparar lectura: " + error.message, "error");
+        }
     });
 
     // Confirmación de Guardado - SI
     document.getElementById("btn-confirm-save-yes").addEventListener("click", () => {
-        const record = window.pendingSaveRecord;
-        const clientName = window.pendingSaveClientName;
-        if (!record) return;
+        try {
+            const record = window.pendingSaveRecord;
+            const clientName = window.pendingSaveClientName;
+            if (!record) return;
 
-        const existingIdx = AppState.readings.findIndex(r => 
-            r.clientId === record.clientId && 
-            r.periodMonth.toLowerCase() === record.periodMonth.toLowerCase() && 
-            parseInt(r.periodYear) === record.periodYear
-        );
+            const existingIdx = AppState.readings.findIndex(r => 
+                r.clientId === record.clientId && 
+                (r.periodMonth || "").toLowerCase() === (record.periodMonth || "").toLowerCase() && 
+                parseInt(r.periodYear || 0) === parseInt(record.periodYear || 0)
+            );
 
-        if (existingIdx !== -1) {
-            AppState.readings[existingIdx] = record;
-        } else {
-            AppState.readings.push(record);
+            if (existingIdx !== -1) {
+                AppState.readings[existingIdx] = record;
+            } else {
+                AppState.readings.push(record);
+            }
+
+            saveReadingsToStorage();
+            renderReadingsTable();
+            updateStats();
+            updateBillingChart();
+
+            // Mostrar notificación de éxito
+            showToast("Lectura guardada correctamente.");
+
+            // Ocultar modal, planilla e inicializar campos
+            document.getElementById("save-confirm-modal").classList.add("hidden");
+            document.getElementById("multi-machine-entry-container").classList.add("hidden");
+            document.getElementById("multi-machine-placeholder").classList.remove("hidden");
+            document.getElementById("entry-client").selectedIndex = 0;
+
+            window.pendingSaveRecord = null;
+            window.pendingSaveClientName = null;
+
+            switchTab("dashboard");
+        } catch (error) {
+            console.error("Error al guardar lectura:", error);
+            showToast("Error al guardar lectura: " + error.message, "error");
         }
-
-        saveReadingsToStorage();
-        renderReadingsTable();
-        updateStats();
-        updateBillingChart();
-
-        // Mostrar notificación de éxito
-        showToast("Lectura guardada correctamente.");
-
-        // Ocultar modal, planilla e inicializar campos
-        document.getElementById("save-confirm-modal").classList.add("hidden");
-        document.getElementById("multi-machine-entry-container").classList.add("hidden");
-        document.getElementById("multi-machine-placeholder").classList.remove("hidden");
-        document.getElementById("entry-client").selectedIndex = 0;
-
-        window.pendingSaveRecord = null;
-        window.pendingSaveClientName = null;
-
-        switchTab("dashboard");
     });
 
     // Confirmación de Guardado - NO
@@ -1558,30 +1576,30 @@ function setupMultiMachineInputSheet(clientObj) {
         if (existingReading) {
             const mReading = existingReading.machineReadings.find(mr => mr.machineId === m.id);
             if (mReading) {
-                prevVal = mReading.isPending ? "" : (mReading.prevCounter !== undefined ? mReading.prevCounter : "");
-                currVal = mReading.isPending ? "" : (mReading.currCounter !== undefined ? mReading.currCounter : "");
-                prevImpVal = mReading.isPending ? "" : (mReading.prevImpresiones !== undefined ? mReading.prevImpresiones : "");
-                currImpVal = mReading.isPending ? "" : (mReading.currImpresiones !== undefined ? mReading.currImpresiones : "");
-                prevCopVal = mReading.isPending ? "" : (mReading.prevCopias !== undefined ? mReading.prevCopias : "");
-                currCopVal = mReading.isPending ? "" : (mReading.currCopias !== undefined ? mReading.currCopias : "");
-                prevPPVal = mReading.isPending ? "" : (mReading.prevPP !== undefined ? mReading.prevPP : "");
-                currPPVal = mReading.isPending ? "" : (mReading.currPP !== undefined ? mReading.currPP : "");
-                prevPFVal = mReading.isPending ? "" : (mReading.prevPF !== undefined ? mReading.prevPF : "");
-                currPFVal = mReading.isPending ? "" : (mReading.currPF !== undefined ? mReading.currPF : "");
+                prevVal = mReading.isPending ? "" : (mReading.prevCounter !== undefined && mReading.prevCounter !== null ? mReading.prevCounter : "");
+                currVal = mReading.isPending ? "" : (mReading.currCounter !== undefined && mReading.currCounter !== null ? mReading.currCounter : "");
+                prevImpVal = mReading.isPending ? "" : (mReading.prevImpresiones !== undefined && mReading.prevImpresiones !== null ? mReading.prevImpresiones : "");
+                currImpVal = mReading.isPending ? "" : (mReading.currImpresiones !== undefined && mReading.currImpresiones !== null ? mReading.currImpresiones : "");
+                prevCopVal = mReading.isPending ? "" : (mReading.prevCopias !== undefined && mReading.prevCopias !== null ? mReading.prevCopias : "");
+                currCopVal = mReading.isPending ? "" : (mReading.currCopias !== undefined && mReading.currCopias !== null ? mReading.currCopias : "");
+                prevPPVal = mReading.isPending ? "" : (mReading.prevPP !== undefined && mReading.prevPP !== null ? mReading.prevPP : "");
+                currPPVal = mReading.isPending ? "" : (mReading.currPP !== undefined && mReading.currPP !== null ? mReading.currPP : "");
+                prevPFVal = mReading.isPending ? "" : (mReading.prevPF !== undefined && mReading.prevPF !== null ? mReading.prevPF : "");
+                currPFVal = mReading.isPending ? "" : (mReading.currPF !== undefined && mReading.currPF !== null ? mReading.currPF : "");
                 
                 hasRepChecked = mReading.hasReplacement ? "checked" : "";
                 repModelVal = mReading.repModel || "";
                 repSerialVal = mReading.repSerialNumber || "";
-                repPrevVal = mReading.isPending ? "" : (mReading.repPrevCounter !== undefined ? mReading.repPrevCounter : "");
-                repCurrVal = mReading.isPending ? "" : (mReading.repCurrCounter !== undefined ? mReading.repCurrCounter : "");
-                repPrevImpVal = mReading.isPending ? "" : (mReading.repPrevImpresiones !== undefined ? mReading.repPrevImpresiones : "");
-                repCurrImpVal = mReading.isPending ? "" : (mReading.repCurrImpresiones !== undefined ? mReading.repCurrImpresiones : "");
-                repPrevCopVal = mReading.isPending ? "" : (mReading.repPrevCopias !== undefined ? mReading.repPrevCopias : "");
-                repCurrCopias = mReading.isPending ? "" : (mReading.repCurrCopias !== undefined ? mReading.repCurrCopias : "");
-                repPrevPPVal = mReading.isPending ? "" : (mReading.repPrevPP !== undefined ? mReading.repPrevPP : "");
-                repCurrPPVal = mReading.isPending ? "" : (mReading.repCurrPP !== undefined ? mReading.repCurrPP : "");
-                repPrevPFVal = mReading.isPending ? "" : (mReading.repPrevPF !== undefined ? mReading.repPrevPF : "");
-                repCurrPFVal = mReading.isPending ? "" : (mReading.repCurrPF !== undefined ? mReading.repCurrPF : "");
+                repPrevVal = mReading.isPending ? "" : (mReading.repPrevCounter !== undefined && mReading.repPrevCounter !== null ? mReading.repPrevCounter : "");
+                repCurrVal = mReading.isPending ? "" : (mReading.repCurrCounter !== undefined && mReading.repCurrCounter !== null ? mReading.repCurrCounter : "");
+                repPrevImpVal = mReading.isPending ? "" : (mReading.repPrevImpresiones !== undefined && mReading.repPrevImpresiones !== null ? mReading.repPrevImpresiones : "");
+                repCurrImpVal = mReading.isPending ? "" : (mReading.repCurrImpresiones !== undefined && mReading.repCurrImpresiones !== null ? mReading.repCurrImpresiones : "");
+                repPrevCopVal = mReading.isPending ? "" : (mReading.repPrevCopias !== undefined && mReading.repPrevCopias !== null ? mReading.repPrevCopias : "");
+                repCurrCopias = mReading.isPending ? "" : (mReading.repCurrCopias !== undefined && mReading.repCurrCopias !== null ? mReading.repCurrCopias : "");
+                repPrevPPVal = mReading.isPending ? "" : (mReading.repPrevPP !== undefined && mReading.repPrevPP !== null ? mReading.repPrevPP : "");
+                repCurrPPVal = mReading.isPending ? "" : (mReading.repCurrPP !== undefined && mReading.repCurrPP !== null ? mReading.repCurrPP : "");
+                repPrevPFVal = mReading.isPending ? "" : (mReading.repPrevPF !== undefined && mReading.repPrevPF !== null ? mReading.repPrevPF : "");
+                repCurrPFVal = mReading.isPending ? "" : (mReading.repCurrPF !== undefined && mReading.repCurrPF !== null ? mReading.repCurrPF : "");
             }
         } else {
             // Intentar buscar la lectura anterior (el último actual registrado históricamente)
@@ -1595,11 +1613,11 @@ function setupMultiMachineInputSheet(clientObj) {
                     if (lastM) break;
                 }
                 if (lastM) {
-                    prevVal = lastM.isPending ? "" : (lastM.currCounter !== undefined ? lastM.currCounter : "");
-                    prevImpVal = lastM.isPending ? "" : (lastM.currImpresiones !== undefined ? lastM.currImpresiones : "");
-                    prevCopVal = lastM.isPending ? "" : (lastM.currCopias !== undefined ? lastM.currCopias : "");
-                    prevPPVal = lastM.isPending ? "" : (lastM.currPP !== undefined ? lastM.currPP : "");
-                    prevPFVal = lastM.isPending ? "" : (lastM.currPF !== undefined ? lastM.currPF : "");
+                    prevVal = lastM.isPending ? "" : (lastM.currCounter !== undefined && lastM.currCounter !== null ? lastM.currCounter : "");
+                    prevImpVal = lastM.isPending ? "" : (lastM.currImpresiones !== undefined && lastM.currImpresiones !== null ? lastM.currImpresiones : "");
+                    prevCopVal = lastM.isPending ? "" : (lastM.currCopias !== undefined && lastM.currCopias !== null ? lastM.currCopias : "");
+                    prevPPVal = lastM.isPending ? "" : (lastM.currPP !== undefined && lastM.currPP !== null ? lastM.currPP : "");
+                    prevPFVal = lastM.isPending ? "" : (lastM.currPF !== undefined && lastM.currPF !== null ? lastM.currPF : "");
                 }
             }
         }
